@@ -132,7 +132,9 @@ if processing_choice == "specific":
         if str(cell_value) != soil_type:  # Compare as strings
             print(f"Row {row}: Deleting cell with value {cell_value} because it doesn't match {soil_type}")
             # Set the value of the cell in column C to None to delete the content
+            new_ws.cell(row=row, column=1).value = None
             new_ws.cell(row=row, column=2).value = None
+
 
 # Save the modified file
 new_wb.save('modified_file.xlsx')
