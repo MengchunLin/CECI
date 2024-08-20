@@ -1,43 +1,30 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import linregress
+import numpy as np
 
-# 假設你的數據保存在CSV文件中，讀取數據
-df = pd.read_csv('Trendline-02.csv')
+# 生成深度数据
+depth = np.linspace(0, 100, 500)
+values = np.sin(depth / 10)
 
-# 假設數據是兩列，depth和qc
-depth = df['Depth (m)']
-qc = df['qc (MPa)']
-
-# 分段數據
-segment_size = 250  # 每段的大小
-segments = [depth[i:i + segment_size] for i in range(0, len(depth), segment_size)]
-qc_segments = [qc[i:i + segment_size] for i in range(0, len(qc), segment_size)]
-
-# 計算每段的斜率
-slopes = []
-for seg_depth, seg_qc in zip(segments, qc_segments):
-    if len(seg_depth) > 1:
-        slope, intercept, r_value, p_value, std_err = linregress(seg_depth, seg_qc)
-        slopes.append((slope, intercept))
+# 定义颜色函数，根据条件返回颜色
+def get_color(value):
+    if value > 0.5:
+        return 'red'
+    elif value > 0:
+        return 'orange'
+    elif value > -0.5:
+        return 'green'
     else:
-        slopes.append((None, None))
+        return 'blue'
 
-# 繪製圖表
-plt.figure(figsize=(10, 6))
-plt.plot(qc, depth, label='qc data', color='blue')
+# 创建一个空白图
+fig, ax = plt.subplots()
 
-# 繪製趨勢線
-for (slope, intercept), seg_depth in zip(slopes, segments):
-    if slope is not None:
-        plt.plot(slope * seg_depth + intercept, seg_depth, label=f'Segment trendline', color='red')
+# 根据条件绘制线条
+for i in range(len(depth) - 1):
+    color = get_color(values[i])
+    ax.plot(depth[i:i+2], values[i:i+2], color=color, lw=2)
 
-plt.gca().invert_yaxis()  # 反轉y軸，因為深度越深數值越大
-plt.xlabel('qc')
-plt.ylabel('Depth')
-plt.title('Trendline-02')
-plt.legend()
-plt.savefig('Trendline-02.png')  # 保存圖表為PNG文件
+plt.xlabel('Depth')
+plt.ylabel('Value')
+plt.title('Line with Different Colors Based on Values')
 plt.show()
-

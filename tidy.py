@@ -3,6 +3,8 @@ from openpyxl import Workbook
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog, messagebox
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 def select_file():
     root = tk.Tk()
@@ -92,7 +94,7 @@ depth = df.iloc[:, 0].dropna()  # Clean depth values
 depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
 qc_dict = dict(zip(depth, value))
-type_values = df.iloc[:, 12].dropna()
+type_values = df.iloc[:, 17].dropna()
 type_dict = dict(zip(depth, type_values))
 
 # Get the number of rows in the DataFrame
@@ -125,7 +127,7 @@ if processing_choice == "specific":
     print('Selected soil type:', soil_type)
     
     for row in range(1, num_points + 1):
-        cell_value = round(new_ws.cell(row=row, column=3).value,0)  # Get the value in column C
+        cell_value = new_ws.cell(row=row, column=3).value  # Get the value in column C
         if cell_value is None:
             continue  # Skip rows where the cell is empty
 
@@ -139,3 +141,50 @@ if processing_choice == "specific":
 # Save the modified file
 new_wb.save('modified_file.xlsx')
 print('File saved as modified_file.xlsx')
+
+# 畫圖
+plot_depth=new_df[0]
+plot_value=new_df[1]
+plot_type=new_df[2]
+print(plot_type)
+
+# 定義顏色函數，根據條件返回顏色
+def get_color(plot_type):
+    if plot_type==1:
+        return 'red'
+    elif plot_type==2:
+        return 'orange'
+    elif plot_type ==3:
+        return'green'
+    elif plot_type ==4:
+        return'blue'
+    else:
+        return 'black'
+    
+# 创建一个空白图
+fig, ax = plt.subplots(figsize=(6, 12))
+
+# 根据条件绘制线条
+for i in range(len(plot_type)-1):
+    color = get_color(plot_type[i])
+    print(color)
+    ax.plot(plot_value[i:i+2], plot_depth[i:i+2], color=color, lw=2)
+# 反轉y軸
+plt.gca().invert_yaxis() 
+
+# 添加图例
+red_patch = mpatches.Patch(color='red', label='Type 1')
+orange_patch = mpatches.Patch(color='orange', label='Type 2')
+green_patch = mpatches.Patch(color='green', label='Type 3')
+blue_patch = mpatches.Patch(color='blue', label='Type 4')
+black_patch = mpatches.Patch(color='black', label='Type 5')
+plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
+plt.xlabel('qc')
+plt.ylabel('Depth(m)')
+plt.title('04 qc and soil type')
+
+# 先保存圖片
+plt.savefig('04 qc and soil type.png')
+
+# 然後顯示圖片
+plt.show()
