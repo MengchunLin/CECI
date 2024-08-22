@@ -94,7 +94,7 @@ depth = df.iloc[:, 0].dropna()  # Clean depth values
 depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
 qc_dict = dict(zip(depth, value))
-type_values = df.iloc[:, 17].dropna()
+type_values = df.iloc[:, 12].dropna()
 type_dict = dict(zip(depth, type_values))
 
 # Get the number of rows in the DataFrame
@@ -163,6 +163,8 @@ def get_color(plot_type):
     
 # 创建一个空白图
 fig, ax = plt.subplots(figsize=(6, 12))
+# y軸最大值為110
+plt.ylim(0, 110)
 
 # 根据条件绘制线条
 for i in range(len(plot_type)-1):
@@ -181,10 +183,10 @@ black_patch = mpatches.Patch(color='black', label='Type 5')
 plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
 plt.xlabel('qc')
 plt.ylabel('Depth(m)')
-plt.title('04 qc and soil type')
+plt.title('03 qc and soil type')
 
 # 先保存圖片
-plt.savefig('04 qc and soil type.png')
+plt.savefig('03 qc and soil type.png')
 
 # 然後顯示圖片
 plt.show()
