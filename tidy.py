@@ -94,7 +94,7 @@ depth = df.iloc[:, 0].dropna()  # Clean depth values
 depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
 qc_dict = dict(zip(depth, value))
-type_values = df.iloc[:, 12].dropna()
+type_values = df.iloc[:, 18].dropna()
 type_dict = dict(zip(depth, type_values))
 
 # Get the number of rows in the DataFrame
