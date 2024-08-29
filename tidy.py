@@ -83,7 +83,7 @@ print(f"Processing choice: {processing_choice}")
 selected_file = select_file()
 
 # Read the Excel file
-df = pd.read_excel(selected_file, header=0)
+df = pd.read_excel(selected_file, header=9)
 
 # Create a new workbook and select the active worksheet
 new_wb = Workbook()
