@@ -111,16 +111,16 @@ for i in range(1, num_points + 1):
 
 # 将工作表中的数据读取到pandas DataFrame中
 new_df = pd.DataFrame(new_ws.values)
-
+#------------------------------------------------
 # 对缺失值进行插值
-new_df[1] = new_df[1].interpolate()
-new_df[2] = new_df[2].ffill()
+# new_df[1] = new_df[1].interpolate()
+# new_df[2] = new_df[2].ffill()
 
 # 将插值后的数据写回到工作表
-for i in range(1, num_points + 1):
-    new_ws.cell(row=i, column=2, value=new_df.iloc[i-1, 1])
-    new_ws.cell(row=i, column=3, value=new_df.iloc[i-1, 2])
-
+# for i in range(1, num_points + 1):
+#     new_ws.cell(row=i, column=2, value=new_df.iloc[i-1, 1])
+#     new_ws.cell(row=i, column=3, value=new_df.iloc[i-1, 2])
+#------------------------------------------------
 # 如果选择了特定土壤类型，则只保留该类型的行
 if processing_choice == "specific":
     soil_type = get_soil_type()
