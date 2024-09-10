@@ -21,27 +21,26 @@ start_row = 10 # 第十行的索引（Python 從 0 開始）
 column_index = 2  # 第二欄的索引
 
 # 獲取要處理的列
-column_data = df_copy.iloc[start_row:, column_index]
+fs = df_copy.iloc[start_row:, column_index]
 
 # 找到需要清除的單元格範圍
 cells_to_clear = []
 empty_count = 0
-for i, value in enumerate(column_data):
+for i, value in enumerate(fs):
     if pd.isna(value) or value == '':  # 檢查 NaN 或空字符串
-        empty_count += 1
-        if empty_count == 4:
-            start_clear = start_row + i - 5  # 第一個空格上面的兩個值
-            end_clear = start_row + i + 9  # 最後一個空格往下的五個值
-            cells_to_clear.extend(range(start_clear, end_clear + 1))
-            empty_count = 0
-    else:
-        empty_count = 0
+        start_clear = start_row + i - 2  # 第一個空格上面的兩個值
+        end_clear = start_row + i + 8  # 最後一個空格往下的八個值
+        cells_to_clear.extend(range(start_clear, end_clear + 1))
+    # 如果不是空白值，則不做處理，也不需要重置 empty_count
+
 
 # 清除找到的單元格值
 cleared_count = 0
 for row in cells_to_clear:
     if row < len(df_copy):
-        df_copy.iloc[row, column_index] = None  # 將值設為 None（在 Excel 中顯示為空白）
+        df_copy.iloc[row, 1] = None
+        df_copy.iloc[row, 2] = None  # 將值設為 None（在 Excel 中顯示為空白）
+        df_copy.iloc[row, 3] = None
         cleared_count += 1
 
 # 將處理後的資料寫入新的 Excel 檔案
