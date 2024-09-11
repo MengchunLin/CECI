@@ -83,7 +83,7 @@ print(f"Processing choice: {processing_choice}")
 selected_file = select_file()
 
 # Read the Excel file
-df = pd.read_excel(selected_file, header=9)
+df = pd.read_excel(selected_file, header=0)
 
 # Create a new workbook and select the active worksheet
 new_wb = Workbook()
@@ -94,7 +94,7 @@ depth = df.iloc[:, 0].dropna()  # Clean depth values
 depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
 qc_dict = dict(zip(depth, value))
-type_values = df.iloc[:, 12].dropna()
+type_values = df.iloc[:, 18].dropna()
 type_dict = dict(zip(depth, type_values))
 
 # Get the number of rows in the DataFrame
@@ -112,11 +112,11 @@ for i in range(1, num_points + 1):
 # 将工作表中的数据读取到pandas DataFrame中
 new_df = pd.DataFrame(new_ws.values)
 #------------------------------------------------
-# 对缺失值进行插值
+# # 对缺失值进行插值
 # new_df[1] = new_df[1].interpolate()
 # new_df[2] = new_df[2].ffill()
 
-# 将插值后的数据写回到工作表
+# # 将插值后的数据写回到工作表
 # for i in range(1, num_points + 1):
 #     new_ws.cell(row=i, column=2, value=new_df.iloc[i-1, 1])
 #     new_ws.cell(row=i, column=3, value=new_df.iloc[i-1, 2])
@@ -187,7 +187,7 @@ black_patch = mpatches.Patch(color='black', label='Type 5')
 plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
 plt.xlabel('qc')
 plt.ylabel('Depth(m)')
-plt.title('03 qc and soil type')
+plt.title('04 qc and soil type')
 plt.grid(linestyle='--', linewidth=0.5)
 x_major_locator = plt.MultipleLocator(5)
 y_major_locator = plt.MultipleLocator(2)
@@ -195,7 +195,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 ax.yaxis.set_major_locator(y_major_locator)
 
 # 先保存圖片
-plt.savefig('03 qc and soil type.png')
+plt.savefig('04 qc and soil type.png')
 
 # 然後顯示圖片
 plt.show()
