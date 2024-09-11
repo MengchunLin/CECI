@@ -26,7 +26,7 @@ gamma_matrix = spherical_variogram(dist_matrix, range_, sill)
 # 增加普通克利金中的拉格朗日乘數條件
 gamma_matrix = np.vstack([np.hstack([gamma_matrix, np.ones((len(positions), 1))]),
                           np.hstack([np.ones((1, len(positions))), np.zeros((1, 1))])])
-print('gamma_matrix',gamma_matrix)
+print('gamma_matrix'+'\n',gamma_matrix)
 
 
 # 計算預測點到已知點的距離
