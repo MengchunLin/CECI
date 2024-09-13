@@ -139,8 +139,8 @@ if processing_choice == "specific":
 
 
 # Save the modified file
-new_wb.save('modified_file.xlsx')
-print('File saved as modified_file.xlsx')
+new_wb.save('modified_file-02.xlsx')
+print('File saved as modified_file-02.xlsx')
 
 # 畫圖
 plot_depth=new_df[0]
@@ -187,7 +187,7 @@ black_patch = mpatches.Patch(color='black', label='Type 5')
 plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
 plt.xlabel('qc')
 plt.ylabel('Depth(m)')
-plt.title('04 qc and soil type')
+plt.title('02 qc and soil type')
 plt.grid(linestyle='--', linewidth=0.5)
 x_major_locator = plt.MultipleLocator(5)
 y_major_locator = plt.MultipleLocator(2)
@@ -195,7 +195,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 ax.yaxis.set_major_locator(y_major_locator)
 
 # 先保存圖片
-plt.savefig('04 qc and soil type.png')
+plt.savefig('02 qc and soil type.png')
 
 # 然後顯示圖片
 plt.show()
