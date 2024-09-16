@@ -44,7 +44,7 @@ for row in cells_to_clear:
         cleared_count += 1
 
 # 將處理後的資料寫入新的 Excel 檔案
-new_file_path = 'processed_data-02.xlsx'
+new_file_path = 'processed_data-04.xlsx'
 df_copy.to_excel(new_file_path, index=False)
 
 print(f"處理後的資料已儲存到 {new_file_path}")
