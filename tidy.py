@@ -83,7 +83,7 @@ print(f"Processing choice: {processing_choice}")
 selected_file = select_file()
 
 # Read the Excel file
-df = pd.read_excel(selected_file, header=11)
+df = pd.read_excel(selected_file, header=10)
 
 # Create a new workbook and select the active worksheet
 new_wb = Workbook()
@@ -93,9 +93,11 @@ new_ws = new_wb.active
 depth = df.iloc[:, 0].dropna()  # Clean depth values
 depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
+print(value)
 qc_dict = dict(zip(depth, value))
-type_values = df.iloc[:, 17].dropna()
-type_dict = dict(zip(depth, type_values))
+type = df.iloc[:, 14].dropna()
+print(type)
+type_dict = dict(zip(depth, type))
 
 # Get the number of rows in the DataFrame
 num_points = int(max(depth)/0.02)
@@ -187,7 +189,7 @@ black_patch = mpatches.Patch(color='black', label='Type 5')
 plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
 plt.xlabel('qc')
 plt.ylabel('Depth(m)')
-plt.title('04 qc and soil type')
+plt.title('03 qc and soil type')
 plt.grid(linestyle='--', linewidth=0.5)
 x_major_locator = plt.MultipleLocator(5)
 y_major_locator = plt.MultipleLocator(2)
@@ -195,7 +197,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 ax.yaxis.set_major_locator(y_major_locator)
 
 # 先保存圖片
-plt.savefig('04 qc and soil type.png')
+plt.savefig('03 qc and soil type.png')
 
 # 然後顯示圖片
 plt.show()
