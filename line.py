@@ -1,96 +1,142 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy import stats
+from scipy import optimize 
 
-# 读取Excel文件
-file_path = 'data.xlsx'  # 替换为你的Excel文件路径
-sheet_name = '工作表1'  # 如果你知道工作表名称，填入这里
-data = pd.read_excel(file_path, sheet_name=sheet_name)
+# 讀取 Excel 文件
+file_path = r'C:\Users\Janet\Desktop\CECI\data.xlsx'
+data = pd.read_excel(file_path, sheet_name='工作表1')
 
-# 假设Excel文件有两列，分别为 'X' 和 'Y'
-x = data['X']
-y = data['Y']
+# 過濾掉含有 NaN 值的行
+data_cleaned = data.dropna(subset=['X', 'Y'])
 
-# 过滤掉包含 NaN 的行
-mask_not_nan = ~(x.isna() | y.isna())
-x = x[mask_not_nan]
-y = y[mask_not_nan]
+# 提取沒有 NaN 的 X 和 Y 值
+x_values = data_cleaned['X'].values
+y_values = data_cleaned['Y'].values
 
-# 过滤掉 X 或 Y 为 0 的数据点
-mask_not_zero = (x != 0) & (y != 0)
-x_filtered = x[mask_not_zero]
-y_filtered = y[mask_not_zero]
+# 創建繪圖
+plt.figure(figsize=(12, 9))
 
-# 定义正弦函数用于拟合
-def sin_func(x, A, B, C, D):
-    return A * np.sin(B * x + C) + D
+# 繪製原始數據點
+plt.scatter(x_values, y_values, color='violet', alpha=0.5, label='qc')
 
-# 定义分段点（这里假设我们将数据分为3段）
-segments = [x_filtered.min(), x_filtered.min() + (x_filtered.max() - x_filtered.min()) / 3,
-            x_filtered.min() + 2 * (x_filtered.max() - x_filtered.min()) / 3, x_filtered.max()]
+# 計算線性趨勢線-------------------------------------
+# slope, intercept, r_value, p_value, std_err = stats.linregress(x_values, y_values)
+# line = slope * x_values + intercept
 
-# 创建一个图形对象
-plt.figure(figsize=(12, 8))
+# # 繪製趨勢線
+# plt.plot(x_values, line, color='skyblue', linestyle='--', label='Trend Line')
 
-# 对每个段落进行拟合和预测
-colors = ['red', 'green', 'blue']
-for i in range(len(segments) - 1):
-    start, end = segments[i], segments[i+1]
-    mask = (x_filtered >= start) & (x_filtered < end)
-    
-    x_segment = x_filtered[mask]
-    y_segment = y_filtered[mask]
-    
-    # 使用 curve_fit 拟合正弦函数
-    params, _ = curve_fit(sin_func, x_segment, y_segment, p0=[1, 1, 0, np.mean(y_segment)])
-    
-    # 生成拟合曲线的点
-    x_fit = np.linspace(start, end, 500)
-    y_fit = sin_func(x_fit, *params)
-    
-    # 绘制原始数据点和拟合曲线
-    plt.scatter(x_segment, y_segment, alpha=0.5, label=f'Data Points Segment {i+1}')
-    plt.plot(x_fit, y_fit, color=colors[i], label=f'Sinusoidal Fit Segment {i+1}')
+# # 計算 R 平方值
+# r_squared = r_value**2
 
-# 反转 Y 轴
+# # 添加線性方程式和 R 平方值到圖表
+# equation = f'y = {slope:.4f}x + {intercept:.4f}'
+# r_squared_text = f'R² = {r_squared:.4f}'
+# plt.text(0.05, 0.95, equation + '\n' + r_squared_text, transform=plt.gca().transAxes,
+#          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+# 定義指數函數-------------------------------------
+# def exp_func(x, a, b):
+#     return a * np.exp(b * x)
+
+# 使用 curve_fit 進行指數擬合
+# popt, pcov = optimize.curve_fit(exp_func, x_values, y_values)
+
+# 生成用於繪製趨勢線的 x 值
+# x_line = np.linspace(min(x_values), max(x_values), 100)
+
+# 繪製指數趨勢線
+# plt.plot(x_line, exp_func(x_line, *popt), color='red', linestyle='--', label='Exponential Trend')
+
+# 計算 R 平方值
+# residuals = y_values - exp_func(x_values, *popt)
+# ss_res = np.sum(residuals**2)
+# ss_tot = np.sum((y_values - np.mean(y_values))**2)
+# r_squared = 1 - (ss_res / ss_tot)
+
+# 設置圖表標籤和標題
+# plt.xlabel('qc (MPa)')
+# plt.ylabel('depth (m)')
+# plt.title('Exponential Trend Line')
+
+# 添加指數方程式和 R 平方值到圖表
+# equation = f'y = {popt[0]:.4f} * e^({popt[1]:.4f}x)'
+# r_squared_text = f'R² = {r_squared:.4f}'
+# plt.text(0.05, 0.95, equation + '\n' + r_squared_text, transform=plt.gca().transAxes,
+#          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+#---------------------------------------------------
+
+# 計算二次趨勢線-------------------------------------
+#使用 numpy 的 polyfit 進行二次擬合 (degree=2)
+#使用 numpy 的 polyfit 進行二次擬合 (degree=2)
+# coefficients = np.polyfit(x_values, y_values, 2)
+# quadratic_trend = np.polyval(coefficients, x_values)
+
+# # 繪製二次趨勢線
+# plt.plot(x_values, quadratic_trend, color='skyblue', linestyle='--', label='Quadratic Trend Line')
+
+# # 計算 R 平方值
+# residuals = y_values - quadratic_trend
+# ss_res = np.sum(residuals**2)
+# ss_tot = np.sum((y_values - np.mean(y_values))**2)
+# r_squared = 1 - (ss_res / ss_tot)
+
+# # 添加二次方程式和 R 平方值到圖表
+# equation = f'y = {coefficients[2]:.4f} + {coefficients[1]:.4f}x + {coefficients[0]:.4f}x²'
+# r_squared_text = f'R² = {r_squared:.4f}'
+# plt.text(0.05, 0.95, equation + '\n' + r_squared_text, transform=plt.gca().transAxes,
+#          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+# 計算三次趨勢線-------------------------------------
+# 使用 numpy 的 polyfit 進行三次擬合 (degree=3)
+coefficients = np.polyfit(x_values, y_values, 3)
+cubic_trend = np.polyval(coefficients, x_values)
+
+# 繪製三次趨勢線
+plt.plot(x_values, cubic_trend, color='skyblue', linestyle='--', label='Cubic Trend Line')
+
+# 計算 R 平方值
+residuals = y_values - cubic_trend
+ss_res = np.sum(residuals**2)
+ss_tot = np.sum((y_values - np.mean(y_values))**2)
+r_squared = 1 - (ss_res / ss_tot)
+
+# 添加三次方程式和 R 平方值到圖表
+equation = (f'y = {coefficients[3]:.4f} + {coefficients[2]:.4f}x '
+            f'+ {coefficients[1]:.4f}x² + {coefficients[0]:.4f}x³')
+r_squared_text = f'R² = {r_squared:.4f}'
+plt.text(0.05, 0.95, equation + '\n' + r_squared_text, transform=plt.gca().transAxes,
+         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+#---------------------------------------------------
+
+
+# 設置圖表標籤和標題
+plt.xlabel('qc (MPa)')
+plt.ylabel('depth (m)')
+plt.title('Trend Line 6-11m')
+
+# 反轉 Y 軸
 plt.gca().invert_yaxis()
 
-# 添加标签
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.title('XY Plot with Segmented Sinusoidal Trend Lines')
+# 添加圖例
 plt.legend()
 
-# 保存图片
-plt.savefig('分段周期趨勢線.png')
+# 顯示網格
+plt.grid(True)
 
-# 显示图形
+# 保存圖表
+plt.savefig('trend_line_index_6-11m.png')
+
+# 顯示圖表
 plt.show()
 
-# 预测缺失值
-predicted_y = np.array([])
-for i in range(len(segments) - 1):
-    start, end = segments[i], segments[i+1]
-    mask = (x >= start) & (x < end)
-    
-    x_segment = x_filtered[x_filtered >= start][x_filtered < end]
-    y_segment = y_filtered[x_filtered >= start][x_filtered < end]
-    
-    params, _ = curve_fit(sin_func, x_segment, y_segment, p0=[1, 1, 0, np.mean(y_segment)])
-    
-    predicted = sin_func(x[mask], *params)
-    predicted_y = np.concatenate([predicted_y, predicted])
+# 輸出被排除的點的數量
+excluded_points = len(data) - len(data_cleaned)
+print(f"排除的數據點數量: {excluded_points}")
 
-# 将预测结果添加到原始数据框中
-data['Predicted_Y'] = predicted_y
-
-# 计算预测误差
-data['Error'] = data['Y'] - data['Predicted_Y']
-mse = np.mean(data['Error']**2)
-print(f"Mean Squared Error: {mse}")
-
-# 保存结果到新的Excel文件
-data.to_excel('predicted_data.xlsx', index=False)
-
-print("分析完成，结果已保存到 'predicted_data.xlsx'")
+# 輸出線性方程式和 R 平方值
+print(f"線性方程式: {equation}")
+print(f"R 平方值: {r_squared:.4f}")

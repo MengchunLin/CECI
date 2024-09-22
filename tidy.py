@@ -95,7 +95,7 @@ depth = np.round(depth, 2)  # Round to 2 decimal places
 value = df.iloc[:, 1].dropna()  # Clean value column
 print(value)
 qc_dict = dict(zip(depth, value))
-type = df.iloc[:, 14].dropna()
+type = df.iloc[:, 16].dropna()
 print(type)
 type_dict = dict(zip(depth, type))
 
@@ -189,7 +189,7 @@ black_patch = mpatches.Patch(color='black', label='Type 5')
 plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
 plt.xlabel('qc')
 plt.ylabel('Depth(m)')
-plt.title('03 qc and soil type')
+plt.title('50cm-03 qc and soil type')
 plt.grid(linestyle='--', linewidth=0.5)
 x_major_locator = plt.MultipleLocator(5)
 y_major_locator = plt.MultipleLocator(2)
@@ -197,7 +197,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 ax.yaxis.set_major_locator(y_major_locator)
 
 # 先保存圖片
-plt.savefig('03 qc and soil type.png')
+plt.savefig('50m - 03 qc and soil type.png')
 
 # 然後顯示圖片
 plt.show()
