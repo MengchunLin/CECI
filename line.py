@@ -17,39 +17,50 @@ def read_data(file_path):
     data = pd.read_excel(file_path)
     return data
 
-# 統計每種土壤的深度範圍，當遇到土壤類型變化時記錄範圍
+# 統計每種土壤的深度範圍，當遇到土壤類型變化時記錄範圍，並計算每段土壤的平均ic
 def calculate_depth_statistics(df):
-    # 假設 df 包含 'Depth (m)', 'qc (MPa)', '合併後' 三列
+    # 假設 df 包含 'Depth (m)', 'qc (MPa)', '合併後', 'ic' 四列
     depth_col = df['Depth (m)']
     type_col = df['合併後']
+    ic_col = df['Ic']
+    mark=df['Mark2']
+    print(mark)
 
-    # 準備變量來記錄每段土壤的範圍
+    # 準備變量來記錄每段土壤的範圍和平均ic
     result = []
     current_type = type_col.iloc[0]
     start_depth = depth_col.iloc[0]
+    ic_values = [ic_col.iloc[0]]  # 用來存儲當前段的所有ic值
 
     # 遍歷每一行，當遇到土壤類型變化時，記錄當前土壤段的範圍
     for i in range(1, len(df)):
-        if type_col.iloc[i] != current_type:
-            # 土壤類型變化，記錄當前土壤的上限和下限
+        if type_col.iloc[i] != current_type and mark.iloc[i] != '*':
+            # 土壤類型變化，記錄當前土壤的上限和下限以及平均ic值
             end_depth = depth_col.iloc[i-1]
-            result.append([current_type, start_depth, end_depth])
+            average_ic = sum(ic_values) / len(ic_values)  # 計算該段土壤的平均ic
+            result.append([current_type, start_depth, end_depth, average_ic])
             
             # 更新當前土壤類型和新的開始深度
             current_type = type_col.iloc[i]
             start_depth = depth_col.iloc[i]
+            ic_values = [ic_col.iloc[i]]  # 重置ic值列表為當前行的ic
+        else:
+            # 如果類型沒變，繼續添加該段的ic值
+            ic_values.append(ic_col.iloc[i])
 
-    # 記錄最後一段土壤的範圍
-    result.append([current_type, start_depth, depth_col.iloc[-1]])
+    # 記錄最後一段土壤的範圍及平均ic值
+    end_depth = depth_col.iloc[-1]
+    average_ic = sum(ic_values) / len(ic_values)
+    result.append([current_type, start_depth, end_depth, average_ic])
 
     # 創建 DataFrame 保存結果
-    depth_stats_df = pd.DataFrame(result, columns=['Type', 'Upper Depth', 'Lower Depth'])
+    depth_stats_df = pd.DataFrame(result, columns=['Type', 'Upper Depth', 'Lower Depth', 'Average IC'])
     
-    print("土壤類型深度統計：")
+    print("土壤類型深度統計和平均 IC：")
     print(depth_stats_df)
 
     # 將結果保存為 Excel 文件
-    depth_stats_df.to_excel('soil_depth_statistics.xlsx', index=False, engine='openpyxl')
+    depth_stats_df.to_excel('soil_depth_statistics_with_ic.xlsx', index=False, engine='openpyxl')
     
     return depth_stats_df
 
@@ -102,7 +113,7 @@ def plot_data(df):
     # 添加標籤和標題
     plt.xlabel('qt(MPa)')
     plt.ylabel('Depth (m)')
-    plt.title('50cm-03 qc and soil type')
+    plt.title('50cm-04 qc and soil type')
     
     # 添加網格
     plt.grid(linestyle='--', linewidth=0.5)
@@ -114,7 +125,7 @@ def plot_data(df):
     ax.yaxis.set_major_locator(y_major_locator)
 
     # 保存圖片
-    plt.savefig('50m-03_qc_and_soil_type.png')
+    plt.savefig('50m-04_qc_and_soil_type.png')
 
     # 顯示圖片
     plt.show()
@@ -130,5 +141,5 @@ if __name__ == "__main__":
     # 繪製圖像
     plot_data(new_df)
 
-    # 計算深度範圍並保存結果於一個新的 xlsx 文件
+    # 計算深度範圍及平均 IC，並保存結果於一個新的 xlsx 文件
     calculate_depth_statistics(new_df)
