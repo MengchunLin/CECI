@@ -23,7 +23,7 @@ for layer in layers:
 drill_holes = [0,3,6]
 for x in drill_holes:
     ax.axvline(x=x, color='yellow', linestyle='-', linewidth=2)
-k
+
 # 設置圖形屬性
 ax.set_xlim(0, 6)
 ax.set_ylim(0, 1)
