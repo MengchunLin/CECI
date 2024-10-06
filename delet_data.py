@@ -1,51 +1,45 @@
 import pandas as pd
-import tkinter as tk
-from tkinter import filedialog
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics.pairwise import euclidean_distances
 
-def select_file():
-    root = tk.Tk()
-    root.withdraw()
-    file_path = filedialog.askopenfilename()
-    print(f"選擇的檔案: {file_path}")
-    return file_path
+# Load the two uploaded Excel files
+file1_path = 'C:/Users/Janet/Desktop/borehole_data/02output.xlsx'
+file2_path = 'C:/Users/Janet/Desktop/borehole_data/04output.xlsx'
 
-# 讀取 Excel 檔案
-selected_file = select_file()
-df = pd.read_excel(selected_file, header=0)
+# Read both datasets
+data1 = pd.read_excel(file1_path)
+data2 = pd.read_excel(file2_path)
 
-# 複製 DataFrame
-df_copy = df.copy()
+# Select relevant soil properties for comparison
+features = ['qc (MPa)', 'fs (MPa)', 'u (MPa)', 'qt(MPa)', 'ϒ(KN/m3)', 'Bq', 'σv(kPa)', 'σ\'v0(kPa)', 'Ic']
 
-# 假設你想從第 10 行開始處理第二欄
-start_row = 10 # 第十行的索引（Python 從 0 開始）
-column_index = 2  # 第二欄的索引
+# Filter out rows with missing values in the selected features
+data1_filtered = data1[features].dropna()
+data2_filtered = data2[features].dropna()
 
-# 獲取要處理的列
-fs = df_copy.iloc[start_row:, column_index]
+# Standardize the data to bring all features to the same scale
+scaler = StandardScaler()
+data1_scaled = scaler.fit_transform(data1_filtered)
+data2_scaled = scaler.transform(data2_filtered)
 
-# 找到需要清除的單元格範圍
-cells_to_clear = []
-empty_count = 0
-for i, value in enumerate(fs):
-    if pd.isna(value) or value == '':  # 檢查 NaN 或空字符串
-        start_clear = start_row + i - 2  # 第一個空格上面的兩個值
-        end_clear = start_row + i + 8  # 最後一個空格往下的八個值
-        cells_to_clear.extend(range(start_clear, end_clear + 1))
-    # 如果不是空白值，則不做處理，也不需要重置 empty_count
+# Compute pairwise Euclidean distances between all depth layers
+distances_optimized = euclidean_distances(data1_scaled, data2_scaled)
 
+# Find the index of the minimum distance for each layer in data1 (most similar layer in data2)
+closest_matches_optimized = distances_optimized.argmin(axis=1)
 
-# 清除找到的單元格值
-cleared_count = 0
-for row in cells_to_clear:
-    if row < len(df_copy):
-        df_copy.iloc[row, 1] = None
-        df_copy.iloc[row, 2] = None  # 將值設為 None（在 Excel 中顯示為空白）
-        df_copy.iloc[row, 3] = None
-        cleared_count += 1
+# Get the corresponding depth and soil properties for the closest matches
+data1_closest_match = data1_filtered.iloc[closest_matches_optimized]
 
-# 將處理後的資料寫入新的 Excel 檔案
-new_file_path = 'processed_data-04.xlsx'
-df_copy.to_excel(new_file_path, index=False)
+# Combine data1 depth with corresponding closest match from data2 for comparison
+comparison_df = pd.DataFrame({
+    'Data1 Depth (m)': data1_filtered.index,
+    'Data2 Closest Match Depth (m)': data2_filtered.index[closest_matches_optimized],
+    'Distance': distances_optimized.min(axis=1)
+})
 
-print(f"處理後的資料已儲存到 {new_file_path}")
-print(f"清除的單元格數: {cleared_count}")
+# Display the comparison result
+comparison_df.head()
+
+# If you want to save the full comparison result to a file:
+comparison_df.to_csv("C:/Users/Janet/Desktop/soil_comparison_results.csv", index=False)
