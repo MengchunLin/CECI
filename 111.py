@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from pathlib import Path
 
+
 # 获取当前脚本目录
 script_dir = Path('.')
 
@@ -81,7 +82,8 @@ for section1, section2 in zip(segmented_df_1.values(), segmented_df_2.values()):
         upper2 = section2['Upper Depth'].iloc[i]
         lower1 = section1['Lower Depth'].iloc[i]
         lower2 = section2['Lower Depth'].iloc[i]
-
+        count1 = section1['Type'].value_counts()
+        count2 = section2['Type'].value_counts()
         # 确定颜色
         color = color_mapping.get(str(type1))
 
@@ -94,17 +96,43 @@ for section1, section2 in zip(segmented_df_1.values(), segmented_df_2.values()):
             })
 
         # 如果土壤类型相同
-        if type1 == type2:
-            layers.append({
-                "name": type1,
-                "color": color,
-                "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
-            })
+        if type1 == type2 :
+            # 連續
+            if section1['Lower Depth'].iloc[i+1] == section2['Lower Depth'].iloc[i+1]:
+                layers.append({
+                    "name": type1,
+                    "color": color,
+                    "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
+                })
+            # 此類型土壤在兩筆資料中數量相同
+            elif count1[type1] == count2[type2]:
+                layers.append({
+                    "name": type1,
+                    "color": color,
+                    "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
+                })
+            # 此類型土壤在兩筆資料中數量不同，向下找3筆資料看是否有相同的土壤類型，若無，則插入空層
+            elif count1[type1] != count2[type2]:
+                # 在沒有資料的地方插入空層s
+                for j in range(i+1, i+4):
+                    if section1['Type'].iloc[i] == section2['Type'].iloc[j] :
+                        layers.append({
+                            "name": type1,
+                            "color": color,
+                            "points": [(borehole_position_1, upper1), (borehole_position_2, section2['Lower Depth'].iloc[i-1]), (borehole_position_2, section2['Lower Depth'].iloc[i-1]), (borehole_position_1, lower1)]
+                        })
+                        layers.append({
+                            "name": f"Missing Type {type2} in Section 2",
+                            "color": 'grey',
+                            "points": [(borehole_position_1, None), (borehole_position_2, None), (borehole_position_2, None), (borehole_position_1, None)]
+                        })
+                        break
+
+            
 
         # 如果土壤类型不同
         elif type1 != type2:
-            count1 = section1['Type'].value_counts()
-            count2 = section2['Type'].value_counts()
+
 
             # 找出缺少的类型
             missing_types_1 = set(count2.index) - set(count1.index)  # 在 section2 有，但 section1 没有的类型
