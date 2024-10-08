@@ -26,9 +26,6 @@ if not file_1_path.exists() or not file_2_path.exists():
 df_1 = pd.read_excel(file_1_path)
 df_2 = pd.read_excel(file_2_path)
 
-# 打印列名以供调试
-print("DataFrame 1 columns:", df_1.columns)
-print("DataFrame 2 columns:", df_2.columns)
 
 # 定义深度范围分段
 sections_df_1 = [
@@ -65,10 +62,8 @@ color_mapping = {
 }
 
 # 遍历每个分段
-# 遍历每个分段
 for section1, section2 in zip(segmented_df_1.values(), segmented_df_2.values()):
     length = min(len(section1), len(section2))  # 确保不会超出短表的长度
-    print(f"Processing section1: {section1}, section2: {section2}")
 
     for i in range(length):
         # 确保访问的索引在范围内
@@ -94,107 +89,43 @@ for section1, section2 in zip(segmented_df_1.values(), segmented_df_2.values()):
                 "color": color,
                 "points": [(borehole_position_1, 0), (borehole_position_2, 0), (borehole_position_2, lower2), (borehole_position_1, lower1)]
             })
-
-        # 如果土壤类型相同
-        if type1 == type2 :
-            # 連續
-            if section1['Lower Depth'].iloc[i+1] == section2['Lower Depth'].iloc[i+1]:
-                layers.append({
-                    "name": type1,
-                    "color": color,
-                    "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
-                })
-            # 此類型土壤在兩筆資料中數量相同
-            elif count1[type1] == count2[type2]:
-                layers.append({
-                    "name": type1,
-                    "color": color,
-                    "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
-                })
-            # 此類型土壤在兩筆資料中數量不同，向下找3筆資料看是否有相同的土壤類型，若無，則插入空層
-            elif count1[type1] != count2[type2]:
-                # 在沒有資料的地方插入空層s
-                for j in range(i+1, i+4):
-                    if section1['Type'].iloc[i] == section2['Type'].iloc[j] :
-                        layers.append({
-                            "name": type1,
-                            "color": color,
-                            "points": [(borehole_position_1, upper1), (borehole_position_2, section2['Lower Depth'].iloc[i-1]), (borehole_position_2, section2['Lower Depth'].iloc[i-1]), (borehole_position_1, lower1)]
-                        })
-                        layers.append({
-                            "name": f"Missing Type {type2} in Section 2",
-                            "color": 'grey',
-                            "points": [(borehole_position_1, None), (borehole_position_2, None), (borehole_position_2, None), (borehole_position_1, None)]
-                        })
-                        break
-
+            count1[type1] -= 1
+            count2[type2] -= 1
+        #如果土讓數量相同
+        if count1[type1] == count2[type2]:
+            #直接找到第一個相同的土壤做連線
+            for j in range(i, length):
+                if section1['Type'].iloc[i] == section2['Type'].iloc[j]:
+                    upper1 = section1['Upper Depth'].iloc[j]
+                    upper2 = section2['Upper Depth'].iloc[j]
+                    lower1 = section1['Lower Depth'].iloc[j]
+                    lower2 = section2['Lower Depth'].iloc[j]
+                    layers.append({
+                        "name": type1,
+                        "color": color,
+                        "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
+                    })
+                    count1[type1] -= 1
+                    count2[type2] -= 1
+                    break
             
 
-        # 如果土壤类型不同
-        elif type1 != type2:
-
-
-            # 找出缺少的类型
-            missing_types_1 = set(count2.index) - set(count1.index)  # 在 section2 有，但 section1 没有的类型
-            missing_types_2 = set(count1.index) - set(count2.index)  # 在 section1 有，但 section2 没有的类型
-
-            # 插入空层来表示缺少的土壤类型
-            for missing_type in missing_types_1:
+        # 如果土壤數量不同
+        else:
+            print("type1",type1)
+            # 如果差值為1
+            if count1[type1] == 1 and count2[type2] ==0 :
                 layers.append({
-                    "name": f"Missing Type {missing_type} in Section 1",
-                    "color": 'grey',
-                    "points": [(borehole_position_1, None), (borehole_position_2, None), (borehole_position_2, None), (borehole_position_1, None)]
+                    "name": type1,
+                    "color": color,
+                    "points": [(borehole_position_1, upper1), (borehole_position_2, previous_lower2), (borehole_position_2, previous_lower2), (borehole_position_1, lower1)]
                 })
+                print("type1",type1)
+                break
+    # 記錄前一個土壤下限
+    previous_lower1 = lower1
+    previous_lower2 = lower2
 
-            for missing_type in missing_types_2:
-                layers.append({
-                    "name": f"Missing Type {missing_type} in Section 2",
-                    "color": 'grey',
-                    "points": [(borehole_position_1, None), (borehole_position_2, None), (borehole_position_2, None), (borehole_position_1, None)]
-                })
-
-            # 寻找最接近的相同土层，来继续绘制
-            min_diff = float('inf')
-            min_index = i  # 初始化为当前索引
-            for j in range(i + 1, length):
-                if j >= len(section1) or j >= len(section2):
-                    break  # 退出循环以避免索引超出范围
-                
-                diff = abs(section1['Average IC'].iloc[j] - section2['Average IC'].iloc[j])
-                if diff < min_diff:
-                    min_diff = diff
-                    min_index = j
-
-            # 画出找到的层
-            upper1 = section1['Upper Depth'].iloc[min_index]
-            upper2 = section2['Upper Depth'].iloc[min_index]
-            lower1 = section1['Lower Depth'].iloc[min_index]
-            lower2 = section2['Lower Depth'].iloc[min_index]
-            layers.append({
-                "name": type1,
-                "color": color,
-                "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
-            })
-        
-        # 在找不到相同层时，在当前深度位置插入空层
-        if i == length - 1:  # 当循环到最后一个
-            layers.append({
-                "name": f"{type1} (missing match)",
-                "color": 'grey',
-                "points": [(borehole_position_1, upper1), (borehole_position_2, upper2), (borehole_position_2, lower2), (borehole_position_1, lower1)]
-            })
-
-# 打印结果
-print("Layers:")
-for layer in layers:
-    print(layer)
-
-
-
-# 打印结果
-print("Layers:")
-for layer in layers:
-    print(layer)
 
 # 绘图
 fig, ax = plt.subplots(figsize=(10, 6))
