@@ -30,7 +30,7 @@ layers = []
 legend_labels = set()
 matched_layers_1 = set()
 matched_layers_2 = set()
-depth_ranges = [(0, 60)]  # 定義深度區間
+depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
 
 upper_depth_draw_1 = 0
 upper_depth_draw_2 = 0
@@ -72,7 +72,7 @@ for depth_start, depth_end in depth_ranges:
         lower_depth_draw_2 = lower_depth_2.iloc[idx_2]
 
         # 如果順序相同，直接匹配
-        if type_1 == type_2:
+        if idx_1==idx_2 and type_1 == type_2:
             layers.append({
                 "points": [(borehole_position_1, upper_depth_draw_1),
                            (borehole_position_2, upper_depth_draw_2),
@@ -90,6 +90,7 @@ for depth_start, depth_end in depth_ranges:
             count_2[type_2] -= 1
             idx_1 += 1
             idx_2 += 1
+            print('順序相同，直接匹配',idx_1,idx_2)
         # 如果數量相同，找到不在matched_layers中的第一個相同的type
         elif count_1[type_1] == count_2[type_2]:
             matched_layers_1.add(idx_1)
@@ -109,85 +110,130 @@ for depth_start, depth_end in depth_ranges:
             count_2[type_2] -= 1
             idx_1 += 1
             idx_2 += 1
-        # 如果數量不同
-        elif count_1[type_1] > count_2[type_2]:
-            #向下找3個type_2，如果3個type_2以內有1個以上的type_1
-            found = False
-            x=0
-            check_layer=[]
-            for i in range(1, 4):
-                if idx_2 + i < len(soil_type_2):
-                    if soil_type_2.iloc[idx_2 + i] == type_1:
-                        x+=1
-                else:
-                    check_layer.append(idx_2 + i)
-            if x>1:
-                found = True
-            # 如果找到，則將檢查check_layer的深度上下限是否在idx_1的深度上下限內
-            if found:
-                for i in check_layer:
-                    if lower_depth_2.iloc[i] <= lower_depth_1.iloc[idx_1] and upper_depth_2.iloc[i] >= upper_depth_1.iloc[idx_1]:
-                        # 把idx_1的土層下限深度/2，並且新增一個土層
-                        half_depth = (lower_depth_1.iloc[idx_1] + upper_depth_1.iloc[idx_1]) / 2
-                        bottom_depth = lower_depth_1.iloc[idx_1]    
-                        copy_layer = pd.DataFrame([[np.nan]*section_df_1.shape[1]], columns=section_df_1.columns)
-                        ection_df_1 = pd.concat([section_df_1.iloc[:idx_1], copy_layer, section_df_1.iloc[idx_1:]]).reset_index(drop=True)
-                        copy_layer['Upper Depth'] = half_depth
-                        copy_layer['Lower Depth'] = bottom_depth
-                        copy_layer['Type'] = type_1
-                        copy_layer['Average Ic'] = Ic_1.iloc[idx_1]
-
-
-
-
-
+            print('數量相同，找到不在matched_layers中的第一個相同的type',idx_1,idx_2)
+        # 如果向下找3個type_2，如果3個type_2以內有1個以上的type_1
+        # 向下檢查最多 3 個 type_2
         else:
-            # 增加厚度為0的土層
-            layers.append({
-                "points": [(borehole_position_1, upper_depth_draw_1),
-                           (borehole_position_2, upper_depth_draw_2),
-                           (borehole_position_2, upper_depth_draw_2),
-                           (borehole_position_1, lower_depth_draw_1)],
-                "color": color_mapping[str(type_1)],
-                "label": type_1 if type_1 not in legend_labels else None
-            })
-            matched_layers_1.add(idx_1)
-            legend_labels.add(type_1)
-            upper_depth_draw_1 = lower_depth_draw_1
-            idx_1 += 1
+            match_count = 0  # 計算匹配次數
+            include_type_2 = []  # 記錄匹配的 type_2 的索引
+            # 檢查 type_1 和接下來 3 層的 type_2 是否有匹配
+            for i in range(0, 4):
+                if idx_2 + i < len(soil_type_2):  # 確保不超出範圍
+                    if soil_type_2.iloc[idx_2 + i] == type_1:  # 如果找到與 type_1 匹配的 type_2
+                        match_count += 1
+                        include_type_2.append(idx_2 + i)  # 記錄匹配的 type_2 的索引
+                        print(f'找到與 type_1 匹配的 type_2 {idx_1} {idx_2+i}')
+            if match_count > 1:  # 如果有多於一個匹配
+                for i in include_type_2:
+                    # 檢查匹配的 type_2 層是否在當前 type_1 的上下限深度之內
+                    if lower_depth_2.iloc[i] <= lower_depth_1.iloc[idx_1] and upper_depth_2.iloc[i] >= upper_depth_1.iloc[idx_1]:
+                        # 分割 type_1 的土層：將其一分為二，並創建一個新的土層
+                        half_depth = (lower_depth_1.iloc[idx_1] + upper_depth_1.iloc[idx_1]) / 2
+                        bottom_depth = lower_depth_1.iloc[idx_1]
+
+                        # 插入新的一層
+                        copy_layer = pd.DataFrame([[np.nan] * section_df_1.shape[1]], columns=section_df_1.columns)
+                        section_df_1 = pd.concat([section_df_1.iloc[:idx_1], copy_layer, section_df_1.iloc[idx_1:]]).reset_index(drop=True)
+                        section_df_1.at[idx_1, 'Upper Depth'] = upper_depth_1.iloc[idx_1]
+                        section_df_1.at[idx_1, 'Lower Depth'] = half_depth
+                        section_df_1.at[idx_1 + 1, 'Upper Depth'] = half_depth
+                        section_df_1.at[idx_1 + 1, 'Lower Depth'] = bottom_depth
+                        section_df_1.at[idx_1, 'Type'] = type_1
+                        section_df_1.at[idx_1 + 1, 'Type'] = type_1
+                        section_df_1.at[idx_1, 'Average Ic'] = Ic_1.iloc[idx_1]
+                        section_df_1.at[idx_1 + 1, 'Average Ic'] = Ic_1.iloc[idx_1]
+                        upper_depth_draw_1 = section_df_1.at[idx_1, 'Upper Depth']
+                        lower_depth_draw_1 = section_df_1.at[idx_1, 'Lower Depth']
+                        # 配對第一個 `type_2` 與第一部分 `type_1`
+                        layers.append({
+                            "points": [(borehole_position_1, upper_depth_draw_1),
+                                    (borehole_position_2, upper_depth_draw_2),
+                                    (borehole_position_2, lower_depth_draw_2),
+                                    (borehole_position_1, lower_depth_draw_1)],
+                            "color": color_mapping[str(type_1)],
+                            "label": type_1 if type_1 not in legend_labels else None
+                        })
+                        matched_layers_1.add(idx_1)
+                        matched_layers_2.add(idx_2)
+                        legend_labels.add(type_1)
+
+                        # 更新深度並繼續配對
+                        upper_depth_draw_1 = lower_depth_draw_1
+                        upper_depth_draw_2 = lower_depth_draw_2
+                        idx_1 += 1
+
+                        # 配對第二部分 `type_1` 與第二個 `type_2`
+                        upper_depth_draw_1 = section_df_1.at[idx_1, 'Upper Depth']
+                        upper_depth_draw_2 = section_df_2.at[idx_1, 'Upper Depth']
+                        lower_depth_draw_1 = lower_depth_1.iloc[idx_1]
+                        lower_depth_draw_2 = lower_depth_2.iloc[i]
+                        layers.append({
+                            "points": [(borehole_position_1, upper_depth_draw_1),
+                                    (borehole_position_2, upper_depth_draw_2),
+                                    (borehole_position_2, lower_depth_draw_2),
+                                    (borehole_position_1, lower_depth_draw_1)],
+                            "color": color_mapping[str(type_1)],
+                            "label": type_1 if type_1 not in legend_labels else None
+                        })
+                        matched_layers_1.add(idx_1)
+                        matched_layers_2.add(i)
+                        legend_labels.add(type_1)
+
+                        # 更新深度，準備下一層的匹配
+                        upper_depth_draw_1 = lower_depth_draw_1
+                        upper_depth_draw_2 = lower_depth_draw_2
+                        idx_1 += 1
+                        idx_2 += 1
+                        print(f'分割了 type_1 層並與 type_2 層 {i} 匹配')
+
+            else:
+                # 增加厚度為0的土層
+                layers.append({
+                    "points": [(borehole_position_1, upper_depth_draw_1),
+                            (borehole_position_2, upper_depth_draw_2),
+                            (borehole_position_2, upper_depth_draw_2),
+                            (borehole_position_1, lower_depth_draw_1)],
+                    "color": color_mapping[str(type_1)],
+                    "label": type_1 if type_1 not in legend_labels else None
+                })
+                matched_layers_1.add(idx_1)
+                legend_labels.add(type_1)
+                upper_depth_draw_1 = lower_depth_draw_1
+                idx_1 += 1
+                print('增加厚度為0的土層',idx_1)
 
     # 處理剩餘的層
-    while idx_1 < len(soil_type_1):
-        type_1 = soil_type_1.iloc[idx_1]
-        lower_depth_draw_1 = lower_depth_1.iloc[idx_1]
-        layers.append({
-            "points": [(borehole_position_1, upper_depth_draw_1),
-                       (borehole_position_2, upper_depth_draw_2),
-                       (borehole_position_2, upper_depth_draw_2),
-                       (borehole_position_1, lower_depth_draw_1)],
-            "color": color_mapping[str(type_1)],
-            "label": type_1 if type_1 not in legend_labels else None
-        })
-        matched_layers_1.add(idx_1)
-        legend_labels.add(type_1)
-        upper_depth_draw_1 = lower_depth_draw_1
-        idx_1 += 1
+    # while idx_1 < len(soil_type_1):
+    #     type_1 = soil_type_1.iloc[idx_1]
+    #     lower_depth_draw_1 = lower_depth_1.iloc[idx_1]
+    #     layers.append({
+    #         "points": [(borehole_position_1, upper_depth_draw_1),
+    #                    (borehole_position_2, upper_depth_draw_2),
+    #                    (borehole_position_2, upper_depth_draw_2),
+    #                    (borehole_position_1, lower_depth_draw_1)],
+    #         "color": color_mapping[str(type_1)],
+    #         "label": type_1 if type_1 not in legend_labels else None
+    #     })
+    #     matched_layers_1.add(idx_1)
+    #     legend_labels.add(type_1)
+    #     upper_depth_draw_1 = lower_depth_draw_1
+    #     idx_1 += 1
 
-    while idx_2 < len(soil_type_2):
-        type_2 = soil_type_2.iloc[idx_2]
-        lower_depth_draw_2 = lower_depth_2.iloc[idx_2]
-        layers.append({
-            "points": [(borehole_position_1, upper_depth_draw_1),
-                       (borehole_position_2, upper_depth_draw_2),
-                       (borehole_position_2, lower_depth_draw_2),
-                       (borehole_position_1, upper_depth_draw_1)],
-            "color": color_mapping[str(type_2)],
-            "label": type_2 if type_2 not in legend_labels else None
-        })
-        matched_layers_2.add(idx_2)
-        legend_labels.add(type_2)
-        upper_depth_draw_2 = lower_depth_draw_2
-        idx_2 += 1
+    # while idx_2 < len(soil_type_2):
+    #     type_2 = soil_type_2.iloc[idx_2]
+    #     lower_depth_draw_2 = lower_depth_2.iloc[idx_2]
+    #     layers.append({
+    #         "points": [(borehole_position_1, upper_depth_draw_1),
+    #                    (borehole_position_2, upper_depth_draw_2),
+    #                    (borehole_position_2, lower_depth_draw_2),
+    #                    (borehole_position_1, upper_depth_draw_1)],
+    #         "color": color_mapping[str(type_2)],
+    #         "label": type_2 if type_2 not in legend_labels else None
+    #     })
+    #     matched_layers_2.add(idx_2)
+    #     legend_labels.add(type_2)
+    #     upper_depth_draw_2 = lower_depth_draw_2
+    #     idx_2 += 1
 
 # 繪圖部分保持不變
 fig, ax = plt.subplots(figsize=(10, 6))
