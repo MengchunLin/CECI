@@ -128,7 +128,7 @@ for depth_start, depth_end in depth_ranges:
                     # 檢查匹配的 type_2 層是否在當前 type_1 的上下限深度之內
                     if lower_depth_2.iloc[i] <= lower_depth_1.iloc[idx_1] and upper_depth_2.iloc[i] >= upper_depth_1.iloc[idx_1]:
                         # 分割 type_1 的土層：將其一分為二，並創建一個新的土層
-                        half_depth = (lower_depth_1.iloc[idx_1] + upper_depth_1.iloc[idx_1]) / 2
+                        half_depth = (lower_depth_1.iloc[idx_1] - upper_depth_1.iloc[idx_1]) / 2 + upper_depth_1.iloc[idx_1]
                         bottom_depth = lower_depth_1.iloc[idx_1]
 
                         # 插入新的一層
