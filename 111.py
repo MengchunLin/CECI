@@ -124,28 +124,37 @@ for depth_start, depth_end in depth_ranges:
                     if soil_type_2.iloc[idx_2 + i] == type_1:  # 如果找到與 type_1 匹配的 type_2
                         match_count += 1
                         include_type_2.append(idx_2 + i)  # 記錄匹配的 type_2 的索引
-                        print(f'找到與 type_1 匹配的 type_2 {idx_1} {idx_2+i}')
 
             if match_count > 1:  # 如果有多於一個匹配
-                skip_flag = True  # 設置跳過標誌
+                # 分割 type_1 的土層：將其一分為二，並創建一個新的土層
+                half_depth = (lower_depth_1.iloc[idx_1] - upper_depth_1.iloc[idx_1]) / 2 + upper_depth_1.iloc[idx_1]
+                bottom_depth = lower_depth_1.iloc[idx_1]
+
+                # 插入新的一層
+                copy_layer = pd.DataFrame([[np.nan] * section_df_1.shape[1]], columns=section_df_1.columns)
+                section_df_1 = pd.concat([section_df_1.iloc[:idx_1], copy_layer, section_df_1.iloc[idx_1:]]).reset_index(drop=True)
+                section_df_1.at[idx_1, 'Upper Depth'] = upper_depth_1.iloc[idx_1]
+                section_df_1.at[idx_1, 'Lower Depth'] = half_depth
+                section_df_1.at[idx_1 + 1, 'Upper Depth'] = half_depth
+                section_df_1.at[idx_1 + 1, 'Lower Depth'] = bottom_depth
+                section_df_1.at[idx_1, 'Type'] = type_1
+                section_df_1.at[idx_1 + 1, 'Type'] = type_1
+                section_df_1.at[idx_1, 'Average Ic'] = Ic_1.iloc[idx_1]
+                section_df_1.at[idx_1 + 1, 'Average Ic'] = Ic_1.iloc[idx_1]
+
+                # skip_flag = True  # 設置跳過標誌
                 for i in include_type_2:
                     # 檢查匹配的 type_2 層是否在當前 type_1 的上下限深度之內
                     if lower_depth_2.iloc[i] <= lower_depth_1.iloc[idx_1] and upper_depth_2.iloc[i] >= upper_depth_1.iloc[idx_1]:
-                        # 分割 type_1 的土層：將其一分為二，並創建一個新的土層
-                        half_depth = (lower_depth_1.iloc[idx_1] - upper_depth_1.iloc[idx_1]) / 2 + upper_depth_1.iloc[idx_1]
-                        bottom_depth = lower_depth_1.iloc[idx_1]
-
-                        # 插入新的一層
-                        copy_layer = pd.DataFrame([[np.nan] * section_df_1.shape[1]], columns=section_df_1.columns)
-                        section_df_1 = pd.concat([section_df_1.iloc[:idx_1], copy_layer, section_df_1.iloc[idx_1:]]).reset_index(drop=True)
-                        section_df_1.at[idx_1, 'Upper Depth'] = upper_depth_1.iloc[idx_1]
-                        section_df_1.at[idx_1, 'Lower Depth'] = half_depth
-                        section_df_1.at[idx_1 + 1, 'Upper Depth'] = half_depth
-                        section_df_1.at[idx_1 + 1, 'Lower Depth'] = bottom_depth
-                        section_df_1.at[idx_1, 'Type'] = type_1
-                        section_df_1.at[idx_1 + 1, 'Type'] = type_1
-                        section_df_1.at[idx_1, 'Average Ic'] = Ic_1.iloc[idx_1]
-                        section_df_1.at[idx_1 + 1, 'Average Ic'] = Ic_1.iloc[idx_1]
+                        layers.append({
+                            "points": [(borehole_position_1, upper_depth_draw_1),
+                                    (borehole_position_2, upper_depth_draw_2),
+                                    (borehole_position_2, lower_depth_draw_2),
+                                    (borehole_position_1, half_depth)],
+                            "color": color_mapping[str(type_1)],
+                            "label": type_1 if type_1 not in legend_labels else None
+                        })
+                        print('向下找3個type_2，如果3個type_2以內有1個以上的type_1',idx_1,idx_2)
                         # 重新取得更新後的 'Upper Depth' 列
                         upper_depth_1 = section_df_1['Upper Depth']
                         # 更新深度並繼續配對
@@ -155,11 +164,11 @@ for depth_start, depth_end in depth_ranges:
 
                         # 配對第二部分 `type_1` 與第二個與type_1相同的 `type_2`
                         upper_depth_draw_1 = upper_depth_1.at[idx_1]
-                        upper_depth_draw_2 = upper_depth_2.at[idx_1 + 1]  # 這裡有問題
+                        upper_depth_draw_2 = upper_depth_2.at[i]  # 這裡有問題
                         lower_depth_draw_1 = lower_depth_1.iloc[idx_1 - 1] # 這裡有問題
                         lower_depth_draw_2 = lower_depth_2.iloc[i]
                         print(upper_depth_draw_1, upper_depth_draw_2, lower_depth_draw_1, lower_depth_draw_2)
-                        
+                        print('向下找3個type_2，如果3個type_2以內有1個以上的type_1',idx_1,idx_2)
                         # 添加匹配的 layer 到 layers
                         layers.append({
                             "points": [(borehole_position_1, upper_depth_draw_1),
@@ -179,15 +188,14 @@ for depth_start, depth_end in depth_ranges:
                         upper_depth_draw_1 = lower_depth_draw_1
                         upper_depth_draw_2 = lower_depth_draw_2
                         idx_1 += 1
-
-                        print(f'分割了 type_1 層並與 type_2 層 {i} 匹配')
-
                         # 更新 idx_2，跳過處理過的 `type_2`，避免重複處理
                         idx_2 = i + 1  # 跳過已匹配過的 `type_2` 層
                         break  # 跳過多餘的循環，繼續處理下一個未匹配的層
 
                 # 如果已設置了 skip_flag，則跳過後續處理，直接跳過這些層
                 if skip_flag:
+                    # 跳過這個idx_2，直接處理下一個idx_2
+                    idx_2 += 1
                     continue
 
                 # 繪圖邏輯保持不變，進行正常處理
@@ -199,7 +207,7 @@ for depth_start, depth_end in depth_ranges:
                     "color": color_mapping[str(type_1)],
                     "label": type_1 if type_1 not in legend_labels else None
                 })
-
+                
                 matched_layers_1.add(idx_1)
                 matched_layers_2.add(idx_2)
                 legend_labels.add(type_1)
