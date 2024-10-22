@@ -28,8 +28,7 @@ color_mapping = {
 # 初始化變量
 layers = []
 legend_labels = set()
-matched_layers_1 = set()
-matched_layers_2 = set()
+
 depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
 
 upper_depth_draw_1 = 0
@@ -38,8 +37,14 @@ lower_depth_draw_1 = 0
 lower_depth_draw_2 = 0
 
 for depth_start, depth_end in depth_ranges:
+    matched_layers_1 = set()
+    matched_layers_2 = set()
+    print('depth_start:',depth_start)
+    print('depth_end:',depth_end)
     section_df_1 = df_1[(df_1['Upper Depth'] > depth_start) & (df_1['Lower Depth'] <= depth_end)].reset_index(drop=True)
     section_df_2 = df_2[(df_2['Upper Depth'] > depth_start) & (df_2['Lower Depth'] <= depth_end)].reset_index(drop=True)
+    print('section_df_1:',section_df_1)
+    print('section_df_2:',section_df_2)
 
     soil_type_1 = section_df_1['Type']
     soil_type_2 = section_df_2['Type']
@@ -60,6 +65,8 @@ for depth_start, depth_end in depth_ranges:
     while idx_1 < len(soil_type_1) and idx_2 < len(soil_type_2):
         type_1 = soil_type_1.iloc[idx_1]
         type_2 = soil_type_2.iloc[idx_2]
+        print('idx_1',idx_1,'type_1:',type_1)
+        print('idx_2',idx_2,'type_2:',type_2)
 
         if idx_1 in matched_layers_1:
             idx_1 += 1
@@ -306,7 +313,7 @@ ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.3, 1))
 plt.gca().invert_yaxis()
 
 ax.set_xlim(0, 1600)
-ax.set_ylim(70, 0)
+ax.set_ylim(110, 0)
 ax.set_title("Soil Type Visualization between Boreholes by Depth Sections")
 ax.set_xlabel("Distance")
 ax.set_ylabel("Depth")
