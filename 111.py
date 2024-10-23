@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from pathlib import Path
 import numpy as np
+import matplotlib.ticker as ticker
 
 # 設置文件路徑
 script_dir = Path('.')
@@ -18,11 +19,11 @@ df_2 = pd.read_excel(file_2_path)
 
 # 定義顏色映射
 color_mapping = {
-    '1': 'lightblue',
-    '2': 'yellow',
-    '3': 'lightgreen',
-    '4': 'orange',
-    '5': 'tan',
+    '1': 'lightsalmon',
+    '2': 'lightblue',
+    '3': 'thistle',
+    '4': 'lemonchiffon',
+    '5': 'sandybrown',
 }
 
 # 初始化變量
@@ -134,7 +135,8 @@ for depth_start, depth_end in depth_ranges:
                         include_type_2.append(idx_2 + i)  # 記錄匹配的 type_2 的索引
                     else:
                         mezzanine.append(soil_type_2.iloc[idx_2 + i])
-
+                print('include_type_2:',include_type_2)
+                print('mezzanine:',mezzanine)
             if match_count > 1:  # 如果有多於一個匹配
                 # skip_flag = True  # 設置跳過標誌
                 for i in include_type_2:
@@ -309,7 +311,7 @@ ax.axvline(x=borehole_position_1, color='black', linestyle='--', linewidth=1, la
 ax.axvline(x=borehole_position_2, color='black', linestyle='--', linewidth=1, label='Borehole 2')
 
 ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.3, 1))
-
+ax.yaxis.set_major_locator(ticker.MultipleLocator(5))  # 每隔5個單位設置一個刻度
 plt.gca().invert_yaxis()
 
 ax.set_xlim(0, 1600)
