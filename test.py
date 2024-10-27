@@ -30,7 +30,7 @@ color_mapping = {
 layers = []
 legend_labels = set()
 
-depth_ranges = [(0, 60),(60,80)]  # 定義深度區間
+depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
 
 last_major_lower_depth = 0
 last_minor_lower_depth = 0
@@ -243,15 +243,16 @@ for depth_range in depth_ranges:
 
         print('include',include)
         for i in include:
+            print('i',i)
             layers.append({
                 "points": [
-                    (major_position, lower_depth_major[idx-1]),
-                    (major_position, lower_depth_major[idx-1]),
+                    (major_position, upper_depth_major[idx]),
+                    (major_position, upper_depth_major[idx]),
                     (minor_position, upper_depth_minor[i]),
                     (minor_position, lower_depth_minor[i]),
                 ],
-                "label": soil_type_major[i],
-                "color": color_mapping[str(int(soil_type_major[i]))],
+                "label": soil_type_minor[i],
+                "color": color_mapping[str(int(soil_type_minor[i]))],
             })
             matched_layers_minor.add(i)
     # 匹配剩下的
