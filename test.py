@@ -105,10 +105,11 @@ for depth_range in depth_ranges:
 
     soil_type_major= major_section['Type']
     soil_type_minor = minor_section['Type']
-    upper_depth_major = major_section['Upper Depth']
-    upper_depth_minor = minor_section['Upper Depth']
-    lower_depth_major = major_section['Lower Depth']
-    lower_depth_minor = minor_section['Lower Depth']
+    # 如果數據需要清理，可以這樣處理：
+    upper_depth_major = major_section['Upper Depth'].astype(float)
+    upper_depth_minor = minor_section['Upper Depth'].astype(float)
+    lower_depth_major = major_section['Lower Depth'].astype(float)
+    lower_depth_minor = minor_section['Lower Depth'].astype(float)
     Ic_major = major_section['Average Ic']
     Ic_minor = minor_section['Average Ic']
     count_major = soil_type_major.value_counts()
@@ -143,6 +144,10 @@ for depth_range in depth_ranges:
         # 匹配match_layer
         if flag:
             layers.append({
+                "upper_depth_major": (major_position, upper_depth_major[idx]),
+                "lower_depth_major": (major_position, lower_depth_major[idx]),
+                "upper_depth_minor": (minor_position, upper_depth_minor[match_layer]),
+                "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
                 "points": [
                     (major_position, upper_depth_major[idx]),
                     (major_position, lower_depth_major[idx]),
@@ -151,6 +156,7 @@ for depth_range in depth_ranges:
                 ],
                 "label": soil_type_major[idx],
                 "color": color_mapping[str(int(soil_type_major[idx]))],
+                "soil_type": soil_type_major[idx],
             })
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
@@ -160,6 +166,10 @@ for depth_range in depth_ranges:
         elif not flag:
             if idx != 0:
                 layers.append({
+                    "upper_depth_major": (major_position, upper_depth_major[idx]),
+                    "lower_depth_major": (major_position, lower_depth_major[idx]),
+                    "upper_depth_minor": (minor_position, lower_depth_minor[match_layer]),
+                    "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
                     "points": [
                         (major_position, upper_depth_major[idx]),
                         (major_position, lower_depth_major[idx]),
@@ -168,6 +178,7 @@ for depth_range in depth_ranges:
                     ],
                     "label": soil_type_major[idx],
                     "color": color_mapping[str(int(soil_type_major[idx]))],
+                    "soil_type": soil_type_major[idx],
                 })
                 matched_layers_major.add(idx)
                 
@@ -176,6 +187,10 @@ for depth_range in depth_ranges:
                 # 當主鑽孔第一筆資料的upper_depth_1小於副鑽孔第一筆資料的upper_depth_2
                 if upper_depth_minor[idx] < upper_depth_major[0]:
                     layers.append({
+                        "upper_depth_major": (major_position, upper_depth_major[0]),
+                        "lower_depth_major": (major_position, lower_depth_major[0]),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[idx]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[idx]),
                         "points": [
                             (major_position, lower_depth_major[0]),
                             (major_position, lower_depth_major[0]),
@@ -184,33 +199,34 @@ for depth_range in depth_ranges:
                         ],
                         "label": soil_type_minor[idx],
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
+                        "soil_type": soil_type_minor[idx],
                     })
                     matched_layers_minor.add(idx)
                     layers.append({
+                        "upper_depth_major": (major_position, upper_depth_major[idx]),
+                        "lower_depth_major": (major_position, lower_depth_major[idx]),
+                        "upper_depth_minor": (minor_position, lower_depth_minor[0]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[0]),
                         "points": [
                             (major_position, upper_depth_major[idx]),
                             (major_position, lower_depth_major[idx]),
                             (minor_position, lower_depth_minor[0]),
                             (minor_position, lower_depth_minor[0]),
                         ],
-                        "label": soil_type_minor[idx],
+                        "label": soil_type_minor[0],
                         "color": color_mapping[str(int(soil_type_major[0]))],
+                        "soil_type": soil_type_minor[0],
                     })
                     matched_layers_major.add(idx)
-                    print('point',
-                            (major_position, lower_depth_major[0]),
-                            (major_position, lower_depth_major[0]),
-                            (minor_position, lower_depth_minor[idx]),
-                            (minor_position, upper_depth_minor[idx]))
-                    print('point',
-                            (major_position, upper_depth_major[idx]),
-                            (major_position, lower_depth_major[idx]),
-                            (minor_position, lower_depth_minor[0]),
-                            (minor_position, lower_depth_minor[0]),)
+
                     
                 # 當副鑽孔的深度大於主鑽孔的深度
                 elif upper_depth_minor[idx] > upper_depth_major[0]:
                     layers.append({
+                        "upper_depth_major": (major_position, upper_depth_major[0]),
+                        "lower_depth_major": (major_position, lower_depth_major[0]),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[idx]),
+                        "lower_depth_minor": (minor_position, upper_depth_minor[idx]),
                         "points": [
                             (major_position, upper_depth_major[0]),
                             (major_position, lower_depth_major[0]),
@@ -219,32 +235,33 @@ for depth_range in depth_ranges:
                         ],
                         "label": soil_type_major[0],
                         "color": color_mapping[str(int(soil_type_major[0]))],
+                        "soil_type": soil_type_major[0],
                     })
                     matched_layers_major.add(0)
                     layers.append({
+                        "upper_depth_major": (major_position, lower_depth_major[idx]),
+                        "lower_depth_major": (major_position, lower_depth_major[idx]),
+                        "upper_depth_minor": (minor_position, lower_depth_minor[0]),
+                        "lower_depth_minor": (minor_position, upper_depth_minor[0]),
                         "points": [
                             (major_position, lower_depth_major[idx]),
                             (major_position, lower_depth_major[idx]),
                             (minor_position, upper_depth_minor[0]),
                             (minor_position, lower_depth_minor[0]),
                         ],
-                        "label": soil_type_major[0],
+                        "label": soil_type_major[idx],
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
+                        "soil_type": soil_type_major[idx],
                     })
                     matched_layers_minor.add(idx)
-                    print('point',(major_position, upper_depth_major[0]),
-                                  (major_position, lower_depth_major[0]),
-                                  (minor_position, upper_depth_minor[idx]),
-                                  (minor_position, upper_depth_minor[idx]),)
-                    print('point',(major_position, lower_depth_major[idx]),
-                            (major_position, lower_depth_major[idx]),
-                            (minor_position, upper_depth_minor[0]),
-                            (minor_position, lower_depth_minor[0]))
 
-        print('include',include)
         for i in include:
             print('i',i)
             layers.append({
+                "upper_depth_major": (major_position, upper_depth_major[idx]),
+                "lower_depth_major": (major_position, upper_depth_major[idx]),
+                "upper_depth_minor": (minor_position, upper_depth_minor[i]),
+                "lower_depth_minor": (minor_position, lower_depth_minor[i]),
                 "points": [
                     (major_position, upper_depth_major[idx]),
                     (major_position, upper_depth_major[idx]),
@@ -253,29 +270,63 @@ for depth_range in depth_ranges:
                 ],
                 "label": soil_type_minor[i],
                 "color": color_mapping[str(int(soil_type_minor[i]))],
+                "soil_type": soil_type_minor[i],
             })
             matched_layers_minor.add(i)
     # 匹配剩下的
     for i in range(len(minor_section)):
         if i not in matched_layers_minor:
             layers.append({
+                "upper_depth_major": (major_position, lower_depth_major[idx]),
+                "lower_depth_major": (major_position, lower_depth_major[idx]),
+                "upper_depth_minor": (minor_position, upper_depth_minor[i]),
+                "lower_depth_minor": (minor_position, lower_depth_minor[i]),
                 "points": [
                     (major_position, lower_depth_major[idx]),
                     (major_position, lower_depth_major[idx]),
                     (minor_position, lower_depth_minor[i]),
                     (minor_position, upper_depth_minor[i]),
                 ],
-                "label": soil_type_minor[idx],
+                "label": soil_type_minor[i],
                 "color": color_mapping[str(int(soil_type_minor[i]))],
+                "soil_type": soil_type_minor[i],
             })
             matched_layers_minor.add(idx)
-            print('match',idx,match_layer)
-            print('i',i)    
     # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
     last_major_lower_depth = lower_depth_major[idx]
     last_minor_lower_depth = lower_depth_minor[i]
 
- 
+weight_1 = 0.5
+weight_2 = 0.5
+
+# 把 layers 的資料轉換成 DataFrame
+df_layers = pd.DataFrame(layers)
+print(df_layers)
+
+# 清理資料、四捨五入到小數點後兩位並轉換為浮點數
+
+# 建立 predict_borehole DataFrame 並新增欄位
+# 建立 predict_borehole DataFrame 並新增欄位
+predict_borehole = pd.DataFrame()
+predict_borehole['Type'] = df_layers['soil_type']
+
+# 分別取出深度值進行計算，並四捨五入到小數點後兩位
+predict_borehole['Upper Depth'] = (
+    df_layers['upper_depth_major'].apply(lambda x: x[1]) * weight_1 + 
+    df_layers['upper_depth_minor'].apply(lambda x: x[1]) * weight_2
+).round(2)
+
+predict_borehole['Lower Depth'] = (
+    df_layers['lower_depth_major'].apply(lambda x: x[1]) * weight_1 + 
+    df_layers['lower_depth_minor'].apply(lambda x: x[1]) * weight_2
+).round(2)
+
+
+
+
+
+print(predict_borehole)
+
 
 # 繪圖
 fig, ax = plt.subplots(figsize=(12, 8))
@@ -285,10 +336,15 @@ used_labels = set()
 legend_handles = []
 
 for layer in layers:
-    points = layer["points"]
+    upper_depth_major = layer["upper_depth_major"]
+    lower_depth_major = layer["lower_depth_major"]
+    upper_depth_minor = layer["upper_depth_minor"]
+    lower_depth_minor = layer["lower_depth_minor"]
+    points = [upper_depth_major, lower_depth_major, lower_depth_minor, upper_depth_minor] # 更新 points 為四點的列表
     label = layer["label"]
     color = layer["color"]
-    
+
+    # 定義多邊形，使用四個點構成的列表
     polygon = Polygon(points, closed=True, color=color, alpha=0.7)
     ax.add_patch(polygon)
     
@@ -299,6 +355,8 @@ for layer in layers:
 # 添加鑽孔位置線
 ax.axvline(x=borehole_position_1, color='black', linestyle='--', linewidth=1, label='Borehole 1')
 ax.axvline(x=borehole_position_2, color='black', linestyle='--', linewidth=1, label='Borehole 2')
+ax.axvline(x=780, color='black', linestyle='--', linewidth=1, label='Borehole 2')
+ax.axvline(x=785, color='black', linestyle='--', linewidth=1, label='Borehole 2')
 
 # 設置圖例
 ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.15, 1))
@@ -306,8 +364,8 @@ ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.15, 1))
 # 設置軸和標題
 ax.yaxis.set_major_locator(ticker.MultipleLocator(10))
 plt.gca().invert_yaxis()
-ax.set_xlim(0, 1600)
-ax.set_ylim(110, 0)
+ax.set_xlim(0, 1558.53)
+ax.set_ylim(105, 0)
 ax.set_title("Soil Type Visualization between Boreholes")
 ax.set_xlabel("Distance (m)")
 ax.set_ylabel("Depth (m)")
