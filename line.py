@@ -99,27 +99,27 @@ def calculate_depth_statistics_with_qc_avg(df):
 def plot_data(df):
     # 假設 df 包含 'Depth', 'Ic', '合併後' 三列
     plot_depth = df['Depth (m)']
-    plot_value = df['Ic']
+    plot_value = df['qc (MPa)']
     plot_type = df['合併後']
 
     # 定義顏色函數，根據類型返回對應顏色
     def get_color(plot_type_value):
         if plot_type_value == 1:
-            return 'red'
+            return 'lightsalmon'
         elif plot_type_value == 2:
-            return 'orange'
+            return 'lightsteelblue'
         elif plot_type_value == 3:
-            return 'green'
+            return 'plum'
         elif plot_type_value == 4:
-            return 'blue'
+            return 'darkkhaki'
         else:
-            return 'black'
+            return 'burlywood'
     
     # 创建图形
     fig, ax = plt.subplots(figsize=(6, 12))
     
     # x軸範圍 0-5，y軸範圍 0-110
-    plt.xlim(0, 5)
+    plt.xlim(0, 80)
     plt.ylim(0, 110)
 
     # 繪製每一段的線條
@@ -131,29 +131,29 @@ def plot_data(df):
     plt.gca().invert_yaxis()
 
     # 添加圖例
-    red_patch = mpatches.Patch(color='red', label='Type 1')
-    orange_patch = mpatches.Patch(color='orange', label='Type 2')
-    green_patch = mpatches.Patch(color='green', label='Type 3')
-    blue_patch = mpatches.Patch(color='blue', label='Type 4')
-    black_patch = mpatches.Patch(color='black', label='Other')
+    red_patch = mpatches.Patch(color='lightsalmon', label='Silt')
+    orange_patch = mpatches.Patch(color='lightsteelblue', label='Silty Sand')
+    green_patch = mpatches.Patch(color='plum', label='Sandy Silt')
+    blue_patch = mpatches.Patch(color='darkkhaki', label='Clayey Silt')
+    black_patch = mpatches.Patch(color='burlywood', label='Caly')
     plt.legend(handles=[red_patch, orange_patch, green_patch, blue_patch, black_patch])
     
     # 添加標籤和標題
-    plt.xlabel('Ic')
+    plt.xlabel('qc (MPa)')
     plt.ylabel('Depth (m)')
-    plt.title('100cm-04 Ic and soil type')
+    plt.title('100cm-04 qc and soil type')
     
     # 添加網格
-    plt.grid(linestyle='--', linewidth=0.5)
+    plt.grid(linestyle='-', linewidth=0.5)
     
     # 設置 x 和 y 軸的刻度
-    x_major_locator = plt.MultipleLocator(1)
+    x_major_locator = plt.MultipleLocator(2)
     y_major_locator = plt.MultipleLocator(10)
     ax.xaxis.set_major_locator(x_major_locator)
     ax.yaxis.set_major_locator(y_major_locator)
 
     # 保存圖片
-    plt.savefig('100cm-04_Ic_and_soil_type.png')
+    plt.savefig('100cm-04_qc_and_soil_type.png')
 
     # 顯示圖片
     plt.show()

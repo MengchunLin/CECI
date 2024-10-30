@@ -10,6 +10,7 @@ script_dir = Path('.')
 file_1_path = script_dir / '02_for_predict_data.xlsx'
 file_2_path = script_dir / '04_for_predict_data.xlsx'
 
+
 borehole_position_1 = 1
 borehole_position_2 = 1558.53
 
@@ -364,7 +365,7 @@ ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.15, 1))
 # 設置軸和標題
 ax.yaxis.set_major_locator(ticker.MultipleLocator(10))
 plt.gca().invert_yaxis()
-ax.set_xlim(0, 1558.53)
+ax.set_xlim(0, borehole_position_2)
 ax.set_ylim(105, 0)
 ax.set_title("Soil Type Visualization between Boreholes")
 ax.set_xlabel("Distance (m)")

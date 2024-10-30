@@ -4,11 +4,17 @@ from matplotlib.patches import Polygon
 from pathlib import Path
 import numpy as np
 import matplotlib.ticker as ticker
+import importlib
+import subprocess
+import json
 
-# 設置文件路徑
-script_dir = Path('.')
-file_1_path = script_dir / '02_for_predict_data.xlsx'
-file_2_path = script_dir / '04_for_predict_data.xlsx'
+# 使用 subprocess 運行 Data_processing.py
+subprocess.run(["python", "Data_processing.py"], capture_output=True, text=True)
+
+with open('created_file.json','r') as f:
+    file_1_path = json.load(f)
+    file_2_path = json.load(f)
+
 
 borehole_position_1 = 1
 borehole_position_2 = 1558.53
@@ -20,17 +26,17 @@ df_2 = pd.read_excel(file_2_path)
 # 定義顏色映射
 color_mapping = {
     '1': 'lightsalmon',
-    '2': 'lightblue',
-    '3': 'thistle',
-    '4': 'lemonchiffon',
-    '5': 'sandybrown',
+    '2': 'lightsteelblue',
+    '3': 'plum',
+    '4': 'darkkhaki',
+    '5': 'burlywood',
 }
 
 # 初始化變量
 layers = []
 legend_labels = set()
 
-depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
+depth_ranges = [(0, 20),(20,60),(60,80),(80,110)]  # 定義深度區間
 
 last_major_lower_depth = 0
 last_minor_lower_depth = 0
@@ -303,10 +309,6 @@ weight_2 = 0.5
 df_layers = pd.DataFrame(layers)
 print(df_layers)
 
-# 清理資料、四捨五入到小數點後兩位並轉換為浮點數
-
-# 建立 predict_borehole DataFrame 並新增欄位
-# 建立 predict_borehole DataFrame 並新增欄位
 predict_borehole = pd.DataFrame()
 predict_borehole['Type'] = df_layers['soil_type']
 
@@ -321,7 +323,9 @@ predict_borehole['Lower Depth'] = (
     df_layers['lower_depth_minor'].apply(lambda x: x[1]) * weight_2
 ).round(2)
 
+predict_borehole['qc (MPa)']=(
 
+)
 
 
 
@@ -371,4 +375,6 @@ ax.set_xlabel("Distance (m)")
 ax.set_ylabel("Depth (m)")
 
 plt.tight_layout()
+# 儲存圖像
+plt.savefig('soil_type_visualization.png', dpi=300)
 plt.show()
