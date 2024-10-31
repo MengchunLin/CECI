@@ -8,20 +8,28 @@ import importlib
 import subprocess
 import json
 
-# 使用 subprocess 運行 Data_processing.py
-subprocess.run(["python", "Data_processing.py"], capture_output=True, text=True)
+# 運行第一個程式
+subprocess.run(["python", "Data_processing.py"])
 
-with open('created_file.json','r') as f:
-    file_1_path = json.load(f)
-    file_2_path = json.load(f)
+# 讀取第一個程式生成的處理後檔案路徑
+with open("processed_files.txt", "r") as f:
+    processed_files = [line.strip() for line in f.readlines()]
 
+# 使用處理過的檔案進行後續處理
+for file in processed_files:
+    df = pd.read_excel(file)
+    print(f"讀取並顯示處理過的檔案 {file} 的內容：")
+    print(df)
 
-borehole_position_1 = 1
-borehole_position_2 = 1558.53
+# 如果需要分別讀取第一和第二個檔案
+df_1 = pd.read_excel(processed_files[0])
+df_2 = pd.read_excel(processed_files[1])
 
-# 讀取文件
-df_1 = pd.read_excel(file_1_path)
-df_2 = pd.read_excel(file_2_path)
+print(df_1)
+
+# 定義鑽孔位置
+borehole_position_1 = 0
+borehole_position_2 = 1580.53
 
 # 定義顏色映射
 color_mapping = {

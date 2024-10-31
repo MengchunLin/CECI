@@ -12,6 +12,16 @@ def select_file():
     file= filedialog.askopenfilename(title="選擇檔案")
     return file
 
+# 設定合併層厚度閾值
+def get_thickness_threshold():
+    root = tk.Tk()
+    root.withdraw()
+    thickness_threshold = (simpledialog.askinteger("合併層厚度", "請輸入合併厚度 (cm):")) / 2
+    if thickness_threshold is None:
+        thickness_threshold = 5  # 默認為5cm
+    root.destroy()
+    return thickness_threshold
+
 # 分類土壤類型
 def classify_soil_type(Ic):
     Ic = round(Ic, 2)
@@ -111,7 +121,7 @@ def write_merged_data(soil_data):
         data_input.extend([soil_type] * thickness)
     return data_input
 
-def process_file(file):
+def process_file(file, thickness_threshold):
     df = pd.read_excel(file, header=0)
     df_copy = df.copy()
 
@@ -134,10 +144,8 @@ def process_file(file):
     # 寫入第一次處理後的數據
     data_input1 = write_merged_data(result_array1)
     df_copy['10cm'] = data_input1
-    df_copy['Mark2']=''
+    df_copy['Mark2'] = ''
     result_array1 = merge_processed_data(result_array1)
-    print(result_array1)
-    print('第一次合併完成')
     
     # 確保數據長度匹配
     if len(data_input1) > len(df_copy):
@@ -145,20 +153,11 @@ def process_file(file):
     elif len(data_input1) < len(df_copy):
         data_input1.extend([''] * (len(df_copy) - len(data_input1)))  # 填充空值以匹配長度
 
-
     #對比soil type 5 和 5cm
     mark_array = mark(Soil_Type_5, data_input1)
 
     # 標記第一次合併後的數據
     df_copy['Mark1'] = mark_array
-
-    # 提示用戶輸入合併厚度
-    root = tk.Tk()
-    root.withdraw()
-    thickness_threshold = (simpledialog.askinteger("合併層厚度", "請輸入合併厚度的閾值 (cm):")) / 2
-    if thickness_threshold is None:
-        thickness_threshold = 5  # 默認為5cm
-    root.destroy()
 
     # 第二次合併（基於用戶輸入的厚度閾值）
     result_array2 = merge_layer(result_array1, thickness_threshold)
@@ -174,7 +173,6 @@ def process_file(file):
 
     df_copy['合併後'] = data_input
 
-
     # 標記第二次合併後的數據
     mark_array = mark(data_input1, data_input)
     df_copy['Mark2'] = mark_array  # 標記第二次合併的變化
@@ -183,18 +181,26 @@ def process_file(file):
     processed_file = file.replace('.xlsx', '_processed.xlsx')
     df_copy.to_excel(processed_file, index=False)
     created_file.append(processed_file)
-    print('資料處理完成')
+    print(f'處理完成，已儲存：{processed_file}')
+    return processed_file
 
-# 主函數，讀取 Excel，處理數據，並導出結果
+# 用清單儲存每次處理後的檔案路徑
+processed_files = []
 def main():
-    file = select_file()
-    process_file(file)
-    file = select_file()
-    process_file(file)
+    # 獲取閾值並初始化列表儲存處理結果
+    thickness_threshold = get_thickness_threshold()
+    processed_files = []
     
-    # Corrected JSON writing section
-    with open('created_file.json', 'w') as f:
-        json.dump(created_file, f, indent=4)  # Save the list as JSON
+    # 假設處理兩個檔案
+    for i in range(2):
+        file = select_file()
+        processed_file = process_file(file, thickness_threshold)
+        processed_files.append(processed_file)
+    
+    # 將處理後的檔案列表寫入文件
+    with open("processed_files.xlsx", "w") as f:
+        f.write("\n".join(processed_files))
+    print("所有檔案簡化土層完成")
 
 if __name__ == "__main__":
     main()
