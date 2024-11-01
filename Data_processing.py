@@ -201,6 +201,7 @@ def main():
     with open("processed_files.xlsx", "w") as f:
         f.write("\n".join(processed_files))
     print("所有檔案簡化土層完成")
+    print(f"已儲存的檔案：{processed_files}")
 
 if __name__ == "__main__":
     main()
