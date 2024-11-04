@@ -8,6 +8,7 @@ import importlib
 import subprocess
 import json
 import os
+from decimal import Decimal, ROUND_UP
 
 # 運行第一個程式
 subprocess.run(["python", "Data_processing.py"])
@@ -123,7 +124,7 @@ last_minor_lower_depth = 0
 
 previous_section_1 = None
 previous_section_2 = None
-
+data = []
 
 # 對比兩個文件的深度區間尋找相近Ic
 for depth_range in depth_ranges:
@@ -208,10 +209,7 @@ for depth_range in depth_ranges:
 
     match_layer = 0
 
-
     for idx in range(len(major_section)):
-        
-
         include = []
         interpolation = 100
         flag = False
@@ -250,16 +248,15 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
             lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-            print(upper_limit, lower_limit)
-            upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+            upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
+            
             steps = int((lower_limit - upper_limit) / 0.02) + 1
             # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
             # 使用layers的數據
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 初始化一個空列表來儲存資料
-            data = []
             for x in range(steps):
                 depth = upper_limit + 0.02 * x
                 if x < len(data_major) and i < len(data_minor):
@@ -287,9 +284,6 @@ for depth_range in depth_ranges:
                         'Soil type': soil_type_major[idx],
                     }
                 data.append(row)
-            result_df = pd.DataFrame(data)
-            # 最後一次性轉換為 DataFrame
-            predict_borehole_data = pd.DataFrame(data)
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
 
@@ -312,20 +306,20 @@ for depth_range in depth_ranges:
                     "color": color_mapping[str(int(soil_type_major[idx]))],
                     "soil_type": soil_type_major[idx],
                 })
-                            # 預測predict_borehole_data的數據
+                # 預測predict_borehole_data的數據
                 # 取用layers的數據
                 upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
                 lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-                print(upper_limit, lower_limit)
-                upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+                upper_limit = round(upper_limit, 2)
                 lower_limit = round(lower_limit, 2)
+                
+                print(upper_limit, lower_limit)
                 steps = int((lower_limit - upper_limit) / 0.02) + 1
                 # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                 # 使用layers的數據
                 data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                 data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                 # 初始化一個空列表來儲存資料
-                data = []
                 for x in range(steps):
                     depth = upper_limit + 0.02 * x
                     if x < len(data_major) and i < len(data_minor):
@@ -353,9 +347,6 @@ for depth_range in depth_ranges:
                             'Soil type': soil_type_major[idx],
                         }
                     data.append(row)
-                result_df = pd.DataFrame(data)
-                # 最後一次性轉換為 DataFrame
-                predict_borehole_data = pd.DataFrame(data)
                 matched_layers_major.add(idx)
 
             else:
@@ -380,16 +371,16 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
                     lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-                    print(upper_limit, lower_limit)
-                    upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+                    upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
+                    
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                     # 初始化一個空列表來儲存資料
-                    data = []
                     for x in range(steps):
                         depth = upper_limit + 0.02 * x
                         if x < len(data_major) and i < len(data_minor):
@@ -417,9 +408,6 @@ for depth_range in depth_ranges:
                                 'Soil type': soil_type_major[idx],
                             }
                         data.append(row)
-                    result_df = pd.DataFrame(data)
-                    # 最後一次性轉換為 DataFrame
-                    predict_borehole_data = pd.DataFrame(data)
                     matched_layers_minor.add(idx)
 
                     layers.append({
@@ -441,16 +429,16 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
                     lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-                    print(upper_limit, lower_limit)
-                    upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+                    upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
+                
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                     # 初始化一個空列表來儲存資料
-                    data = []
                     for x in range(steps):
                         depth = upper_limit + 0.02 * x
                         if x < len(data_major) and i < len(data_minor):
@@ -478,9 +466,6 @@ for depth_range in depth_ranges:
                                 'Soil type': soil_type_major[idx],
                             }
                         data.append(row)
-                    result_df = pd.DataFrame(data)
-                    # 最後一次性轉換為 DataFrame
-                    predict_borehole_data = pd.DataFrame(data)
                     matched_layers_major.add(idx)
 
                     
@@ -505,16 +490,15 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
                     lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-                    print(upper_limit, lower_limit)
-                    upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+                    upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                     # 初始化一個空列表來儲存資料
-                    data = []
                     for x in range(steps):
                         depth = upper_limit + 0.02 * x
                         if x < len(data_major) and i < len(data_minor):
@@ -542,9 +526,6 @@ for depth_range in depth_ranges:
                                 'Soil type': soil_type_major[idx],
                             }
                         data.append(row)
-                    result_df = pd.DataFrame(data)
-                    # 最後一次性轉換為 DataFrame
-                    predict_borehole_data = pd.DataFrame(data)
                     matched_layers_major.add(0)
 
                     layers.append({
@@ -566,16 +547,15 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
                     lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-                    print(upper_limit, lower_limit)
-                    upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+                    upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                     # 初始化一個空列表來儲存資料
-                    data = []
                     for x in range(steps):
                         depth = upper_limit + 0.02 * x
                         if x < len(data_major) and i < len(data_minor):
@@ -603,9 +583,6 @@ for depth_range in depth_ranges:
                                 'Soil type': soil_type_major[idx],
                             }
                         data.append(row)
-                    result_df = pd.DataFrame(data)
-                    # 最後一次性轉換為 DataFrame
-                    predict_borehole_data = pd.DataFrame(data)
                     matched_layers_minor.add(idx)
 
         for i in include:
@@ -629,16 +606,16 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
             lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-            print(upper_limit, lower_limit)
-            upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+            upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
+            
+            print(upper_limit, lower_limit)
             steps = int((lower_limit - upper_limit) / 0.02) + 1
             # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
             # 使用layers的數據
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 初始化一個空列表來儲存資料
-            data = []
             for x in range(steps):
                 depth = upper_limit + 0.02 * x
                 if x < len(data_major) and i < len(data_minor):
@@ -666,9 +643,6 @@ for depth_range in depth_ranges:
                         'Soil type': soil_type_major[idx],
                     }
                 data.append(row)
-            result_df = pd.DataFrame(data)
-            # 最後一次性轉換為 DataFrame
-            predict_borehole_data = pd.DataFrame(data)
             matched_layers_minor.add(i)
     # 匹配剩下的
     for i in range(len(minor_section)):
@@ -692,16 +666,16 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
             lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-            print(upper_limit, lower_limit)
-            upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+            upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
+            
+            print(upper_limit, lower_limit)
             steps = int((lower_limit - upper_limit) / 0.02) + 1
             # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
             # 使用layers的數據
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 初始化一個空列表來儲存資料
-            data = []
             for x in range(steps):
                 depth = upper_limit + 0.02 * x
                 if x < len(data_major) and i < len(data_minor):
@@ -729,10 +703,9 @@ for depth_range in depth_ranges:
                         'Soil type': soil_type_major[idx],
                     }
                 data.append(row)
-            result_df = pd.DataFrame(data)
-            # 最後一次性轉換為 DataFrame
-            predict_borehole_data = pd.DataFrame(data)
             matched_layers_minor.add(idx)
+    # 最後一次性轉換為 DataFrame
+    predict_borehole_data = pd.DataFrame(data)
     # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
     last_major_lower_depth = lower_depth_major[idx]
     last_minor_lower_depth = lower_depth_minor[i]
@@ -761,6 +734,9 @@ predict_borehole['Lower Depth'] = (
 
 # 儲存預測的鑽孔位置
 predict_borehole.to_excel('predict_borehole.xlsx', index=False)
+
+# 儲存預測的鑽孔資料
+predict_borehole_data.to_excel('predict_borehole_data.xlsx', index=False)
 
 
 
