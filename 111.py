@@ -4,45 +4,128 @@ from matplotlib.patches import Polygon
 from pathlib import Path
 import numpy as np
 import matplotlib.ticker as ticker
+import importlib
+import subprocess
+import json
+import os
 
-# 設置文件路徑
-script_dir = Path('.')
-file_1_path = script_dir / '02_for_predict_data.xlsx'
-file_2_path = script_dir / '04_for_predict_data.xlsx'
+# 運行第一個程式
+subprocess.run(["python", "Data_processing.py"])
+
+# 讀取第一個程式生成的處理後檔案路徑
+with open("processed_files.xlsx", "r") as f:
+    processed_files = [line.strip() for line in f.readlines()]
 
 
-borehole_position_1 = 1
-borehole_position_2 = 1558.53
+# 使用處理過的檔案進行後續處理
+for file in processed_files:
+    df = pd.read_excel(file)
 
-# 讀取文件
-df_1 = pd.read_excel(file_1_path)
-df_2 = pd.read_excel(file_2_path)
+
+# 自動命名並選擇儲存路徑
+def auto_save_file(file_path):
+    directory, original_filename = os.path.split(file_path)
+    name, ext = os.path.splitext(original_filename)
+    new_filename = f"{name}_statistical_depth{ext}"
+    save_path = os.path.join(directory, new_filename)
+
+    return save_path
+
+# 統計每種土壤的深度範圍，並計算平均IC（前200筆資料不納入計算）
+def calculate_depth_statistics_with_qc_avg(df, original_file_path):
+    depth_col = df['Depth (m)']
+    type_col = df['合併後']
+    ic_col = df['Ic']
+    Mark_1 = df['Mark1']
+    Mark_2 = df['Mark2']
+    Bq = df['Bq']
+
+    # 準備變量來記錄每段土壤的範圍和平均IC值
+    result = []
+    current_type = type_col.iloc[0]  # 從第201筆資料開始
+    start_depth = depth_col.iloc[0]
+    ic_values = []
+
+    # 遍歷每一行，從第201筆開始，當遇到土壤類型變化或標記改變時，記錄當前土壤段的範圍
+    for i in range(201, len(df)):
+        if type_col.iloc[i] != current_type:  # 當類型變化時，記錄當前段的數據
+            end_depth = depth_col.iloc[i - 1]
+            average_ic = sum(ic_values) / len(ic_values) if ic_values else None
+            result.append([current_type, start_depth, end_depth, average_ic])
+            current_type = type_col.iloc[i]
+            start_depth = depth_col.iloc[i]
+            ic_values = []  # 重置IC值列表
+
+        # 僅在條件符合時記錄 Ic 值
+        if Mark_2.iloc[i] != '*' and pd.notna(Bq.iloc[i]) and Bq.iloc[i] != 0 and Mark_1.iloc[i] != '*':
+            ic_values.append(ic_col.iloc[i])
+
+    # 記錄最後一段土壤的範圍及平均IC值
+    end_depth = depth_col.iloc[-1]
+    average_ic = sum(ic_values) / len(ic_values) if ic_values else None
+    result.append([current_type, start_depth, end_depth, average_ic])
+
+    # 創建 DataFrame 保存結果
+    depth_stats_df = pd.DataFrame(result, columns=['Type', 'Upper Depth', 'Lower Depth', 'Average Ic'])
+
+    # 自動保存結果
+    save_path = auto_save_file(original_file_path)
+    depth_stats_df.to_excel(save_path, index=False)
+
+
+    return depth_stats_df
+
+for i in range(2):
+    calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[i]), processed_files[i])
+
+# 如果需要分別讀取第一和第二個檔案
+df_1 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[0]), processed_files[0])
+df_2 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[1]), processed_files[1])
+# 儲存一份processed_files.xlsx
+data_1 = pd.read_excel(processed_files[0])
+data_2 = pd.read_excel(processed_files[1])
+
+
+# 定義鑽孔位置
+borehole_position_1 = 0
+borehole_position_2 = 1580.53
+
+weight_1 = 0.5
+weight_2 = 0.5
 
 # 定義顏色映射
 color_mapping = {
     '1': 'lightsalmon',
-    '2': 'lightblue',
-    '3': 'thistle',
-    '4': 'lemonchiffon',
-    '5': 'sandybrown',
+    '2': 'lightsteelblue',
+    '3': 'plum',
+    '4': 'darkkhaki',
+    '5': 'burlywood',
 }
 
 # 初始化變量
 layers = []
 legend_labels = set()
+predict_borehole = pd.DataFrame()
+predict_borehole_data = pd.DataFrame()
+# 假設 predict_borehole_data 已初始化為一個空的 DataFrame
+predict_borehole_data = pd.DataFrame({
+    'Depth (m)': pd.Series(dtype='float64'),
+    'qc (MPa)': pd.Series(dtype='float64'),
+    'fs (MPa)': pd.Series(dtype='float64'),
+    'u (MPa)': pd.Series(dtype='float64'),
+    'Soil type': pd.Series(dtype='object')
+})
 
-depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
-
-last_major_lower_depth = 0
-last_minor_lower_depth = 0
+depth_ranges = [(0, 20),(20,60),(60,80),(80,110)]  # 定義深度區間
 
 previous_section_1 = None
 previous_section_2 = None
+
+
 # 對比兩個文件的深度區間尋找相近Ic
 for depth_range in depth_ranges:
     
     start_depth, end_depth = depth_range
-    print('range[',start_depth,end_depth,']')
     matched_layers_major = set()
     matched_layers_minor = set()
     all_types = set()
@@ -64,11 +147,10 @@ for depth_range in depth_ranges:
         # 比較範圍外的土壤類型是否相同
         if next_soil_type_1 == last_row_2['Type']:
             # 如果相同，則將範圍外的資料整行加入範圍內
-            section_df_1 = section_df_1._append(next_row_1.iloc[0]).reset_index(drop=True)
-            print(next_soil_type_1,last_row_2['Type'])
+            section_df_1 = pd.concat([section_df_1, next_row_1.iloc[[0]]], ignore_index=True)
         elif next_soil_type_2 == last_row_1['Type']:
-            section_df_2 = section_df_2._append(next_row_2.iloc[0]).reset_index(drop=True)
-            print(next_soil_type_2,last_row_1['Type'])
+            section_df_2 = pd.concat([section_df_2, next_row_2.iloc[[0]]], ignore_index=True)
+
 
 # 刪除與上一區間重複的資料
     if previous_section_1 is not None:
@@ -103,6 +185,8 @@ for depth_range in depth_ranges:
     minor_section = section_df_2 if len_1 < len_2 else section_df_1
     major_position = borehole_position_1 if len_1 < len_2 else borehole_position_2
     minor_position = borehole_position_2 if len_1 < len_2 else borehole_position_1
+    major_data = data_1 if len_1 < len_2 else data_2
+    minor_data = data_2 if len_1 < len_2 else data_1
 
     soil_type_major= major_section['Type']
     soil_type_minor = minor_section['Type']
@@ -159,9 +243,53 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_major[idx]))],
                 "soil_type": soil_type_major[idx],
             })
+            # 預測predict_borehole_data的數據
+            # 取用layers的數據
+            upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
+            lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+            print(upper_limit, lower_limit)
+            upper_limit = round(upper_limit, 2)  # 要把浮點數i四捨五入到小數點後兩位
+            lower_limit = round(lower_limit, 2)
+            steps = int((lower_limit - upper_limit) / 0.02) + 1
+            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
+            # 使用layers的數據
+            data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
+            data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
+            # 初始化一個空列表來儲存資料
+            data = []
+            for i in range(steps):
+                depth = upper_limit + 0.02 * i
+                if i < len(data_major) and i < len(data_minor):
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': (data_major.iloc[i]['qc (MPa)'] * weight_1 + data_minor.iloc[i]['qc (MPa)'] * weight_2),
+                        'fs (MPa)': (data_major.iloc[i]['fs (MPa)'] * weight_1 + data_minor.iloc[i]['fs (MPa)'] * weight_2),
+                        'u (MPa)': (data_major.iloc[i]['u (MPa)'] * weight_1 + data_minor.iloc[i]['u (MPa)'] * weight_2),
+                        'Soil type': soil_type_major[idx],
+                    }
+                elif i < len(data_major):
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': data_major.iloc[i]['qc (MPa)'],
+                        'fs (MPa)': data_major.iloc[i]['fs (MPa)'],
+                        'u (MPa)': data_major.iloc[i]['u (MPa)'],
+                        'Soil type': soil_type_major[idx],
+                    }
+                elif i < len(data_minor):
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': data_minor.iloc[i]['qc (MPa)'],
+                        'fs (MPa)': data_minor.iloc[i]['fs (MPa)'],
+                        'u (MPa)': data_minor.iloc[i]['u (MPa)'],
+                        'Soil type': soil_type_major[idx],
+                    }
+                data.append(row)
+            result_df = pd.DataFrame(data)
+            # 最後一次性轉換為 DataFrame
+            predict_borehole_data = pd.DataFrame(data)
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
-            print('match',idx,match_layer)
+
 
         
         elif not flag:
@@ -182,8 +310,7 @@ for depth_range in depth_ranges:
                     "soil_type": soil_type_major[idx],
                 })
                 matched_layers_major.add(idx)
-                
-                print('match',idx,match_layer)
+
             else:
                 # 當主鑽孔第一筆資料的upper_depth_1小於副鑽孔第一筆資料的upper_depth_2
                 if upper_depth_minor[idx] < upper_depth_major[0]:
@@ -202,7 +329,11 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
                         "soil_type": soil_type_minor[idx],
                     })
+                    result_df = pd.DataFrame(data)
+                    # 最後一次性轉換為 DataFrame
+                    predict_borehole_data = pd.DataFrame(data)
                     matched_layers_minor.add(idx)
+
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[idx]),
                         "lower_depth_major": (major_position, lower_depth_major[idx]),
@@ -239,6 +370,7 @@ for depth_range in depth_ranges:
                         "soil_type": soil_type_major[0],
                     })
                     matched_layers_major.add(0)
+
                     layers.append({
                         "upper_depth_major": (major_position, lower_depth_major[idx]),
                         "lower_depth_major": (major_position, lower_depth_major[idx]),
@@ -254,10 +386,10 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
                         "soil_type": soil_type_major[idx],
                     })
-                    matched_layers_minor.add(idx)
+
 
         for i in include:
-            print('i',i)
+
             layers.append({
                 "upper_depth_major": (major_position, upper_depth_major[idx]),
                 "lower_depth_major": (major_position, upper_depth_major[idx]),
@@ -273,6 +405,7 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_minor[i]))],
                 "soil_type": soil_type_minor[i],
             })
+
             matched_layers_minor.add(i)
     # 匹配剩下的
     for i in range(len(minor_section)):
@@ -292,23 +425,18 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_minor[i]))],
                 "soil_type": soil_type_minor[i],
             })
-            matched_layers_minor.add(idx)
-    # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
-    last_major_lower_depth = lower_depth_major[idx]
-    last_minor_lower_depth = lower_depth_minor[i]
 
-weight_1 = 0.5
-weight_2 = 0.5
+            result_df = pd.DataFrame(data)
+            matched_layers_minor.add(idx)
+
+
+
 
 # 把 layers 的資料轉換成 DataFrame
 df_layers = pd.DataFrame(layers)
-print(df_layers)
 
-# 清理資料、四捨五入到小數點後兩位並轉換為浮點數
 
-# 建立 predict_borehole DataFrame 並新增欄位
-# 建立 predict_borehole DataFrame 並新增欄位
-predict_borehole = pd.DataFrame()
+
 predict_borehole['Type'] = df_layers['soil_type']
 
 # 分別取出深度值進行計算，並四捨五入到小數點後兩位
@@ -324,9 +452,10 @@ predict_borehole['Lower Depth'] = (
 
 
 
+# 儲存預測的鑽孔位置
+predict_borehole.to_excel('predict_borehole.xlsx', index=False)
 
 
-print(predict_borehole)
 
 
 # 繪圖
@@ -372,4 +501,6 @@ ax.set_xlabel("Distance (m)")
 ax.set_ylabel("Depth (m)")
 
 plt.tight_layout()
+# 儲存圖像
+plt.savefig('soil_type_visualization.png', dpi=300)
 plt.show()

@@ -105,7 +105,14 @@ color_mapping = {
 layers = []
 legend_labels = set()
 predict_borehole = pd.DataFrame()
-predict_borehole_data = pd.DataFrame()
+# 假設 predict_borehole_data 已初始化為一個空的 DataFrame
+predict_borehole_data = pd.DataFrame({
+    'Depth (m)': pd.Series(dtype='float64'),
+    'qc (MPa)': pd.Series(dtype='float64'),
+    'fs (MPa)': pd.Series(dtype='float64'),
+    'u (MPa)': pd.Series(dtype='float64'),
+    'Soil type': pd.Series(dtype='object')
+})
 
 depth_ranges = [(0, 20),(20,60),(60,80),(80,110)]  # 定義深度區間
 
@@ -199,8 +206,6 @@ for depth_range in depth_ranges:
 
 
     for idx in range(len(major_section)):
-        
-
         include = []
         interpolation = 100
         flag = False
@@ -211,7 +216,6 @@ for depth_range in depth_ranges:
                     interpolation = x
                     match_layer = idx + i
                     flag = True
-
 
         # 刪除include裡<match_layer的數字
         for i in range(idx, match_layer):
@@ -235,32 +239,64 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_major[idx]))],
                 "soil_type": soil_type_major[idx],
             })
-            # 取data_1的在upper_depth_major[idx]~lower_depth_major[idx]的qc資料
-            data_1_picked = major_data[(major_data['Depth (m)'] >= upper_depth_major[idx]) & (major_data['Depth (m)'] <= lower_depth_major[idx])]
-            data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_depth_minor[match_layer]) & (minor_data['Depth (m)'] <= lower_depth_minor[match_layer])]
+            print('number',idx)
+            print('soil type',soil_type_major[idx])
+
             # 計算upper_limit= upper_depth_major*weight_1 + upper_depth_minor*weight_2
             upper_limit= (upper_depth_major[idx] * weight_1 + upper_depth_minor[match_layer] * weight_2).round(2)
             # 計算lower_limit= lower_depth_major*weight_1 + lower_depth_minor*weight_2
             lower_limit= (lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2).round(2)
-            # predict_borehole_data['Upper depth'] = upper_limit
-            predict_borehole_data['Upper Depth'] = upper_limit
-            # predict_borehole_data['Lower depth'] = lower_limit
-            predict_borehole_data['Lower Depth'] = lower_limit
+            predict_borehole['Upper Depth'] = upper_limit
+            predict_borehole['Lower Depth'] = lower_limit
+            predict_borehole['Type'] = soil_type_major[idx]
+            # 取data_1的在upper_depth_major[idx]~lower_depth_major[idx]的qc資料
+            data_1_picked = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
+            data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 在upper_limit和lower_limit之間的資料
+            depth_1 = data_1_picked['Depth (m)']
+            depth_2 = data_2_picked['Depth (m)']
             qc_1 = data_1_picked['qc (MPa)']
             qc_2 = data_2_picked['qc (MPa)']
             fs_1 = data_1_picked['fs (MPa)']
             fs_2 = data_2_picked['fs (MPa)']
             u_1 = data_1_picked['u (MPa)']
             u_2 = data_2_picked['u (MPa)']
-            
-            
+            type_1 = data_1_picked['合併後']
+            type_2 = data_2_picked['合併後']
+            num_steps = int((lower_limit - upper_limit) / 0.02) + 1  # Calculate the number of steps
+            for i in range(num_steps):
+                if i < len(depth_1) and i < len(depth_2):
+                    depth = 0.02 * i + upper_limit
+                    # 如果Depth (m) [i]位置的'Type'=soil_type_major[idx]，則計算加權平均
+                    qc = (qc_1.iloc[i] * weight_1 + qc_2.iloc[i] * weight_2).round(3)
+                    fs = (fs_1.iloc[i] * weight_1 + fs_2.iloc[i] * weight_2).round(3)
+                    u = (u_1.iloc[i] * weight_1 + u_2.iloc[i] * weight_2).round(3)
+                    soil_type = type_1.iloc[i]
+                    new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                    predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
+                elif i < len(depth_1) and i >= len(depth_2):
+                    depth = 0.02 * i + upper_limit
+                    qc = qc_1.iloc[i]
+                    fs = fs_1.iloc[i]
+                    u = u_1.iloc[i]
+                    soil_type = type_1.iloc[i]
+                    new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                    predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
+                elif i >= len(depth_1) and i < len(depth_2):
+                    depth = 0.02 * i + upper_limit
+                    qc = qc_2.iloc[i]
+                    fs = fs_2.iloc[i]
+                    u = u_2.iloc[i]
+                    soil_type = type_2.iloc[i]
+                    new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                    predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
 
 
         
         elif not flag:
+            # 新增厚度為0的層
             if idx != 0:
                 layers.append({
                     "upper_depth_major": (major_position, upper_depth_major[idx]),
@@ -277,11 +313,35 @@ for depth_range in depth_ranges:
                     "color": color_mapping[str(int(soil_type_major[idx]))],
                     "soil_type": soil_type_major[idx],
                 })
+                upper_limit= (upper_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2).round(2)
+                lower_limit= (lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2).round(2)
+                predict_borehole['Upper Depth'] = upper_limit
+                predict_borehole['Lower Depth'] = lower_limit
+                predict_borehole['Type'] = soil_type_major[idx]
+                data_1_picked = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
+                depth_1 = data_1_picked['Depth (m)']
+                qc_1 = data_1_picked['qc (MPa)']
+                fs_1 = data_1_picked['fs (MPa)']
+                u_1 = data_1_picked['u (MPa)']
+                type_1 = data_1_picked['合併後']
+                num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+                for i in range(num_steps):
+                    if i < len(depth_1):
+                        depth = 0.02 * i + upper_limit
+                        qc = qc_1.iloc[i]
+                        fs = fs_1.iloc[i]
+                        u = u_1.iloc[i]
+                        soil_type = type_1.iloc[i]
+                        new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                        predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
                 matched_layers_major.add(idx)
+                
+
 
             else:
-                # 當主鑽孔第一筆資料的upper_depth_1小於副鑽孔第一筆資料的upper_depth_2
+                # 當副鑽孔第一筆資料的upper_depth_1小於主鑽孔第一筆資料的upper_depth_2
                 if upper_depth_minor[idx] < upper_depth_major[0]:
+                    # 先處理副鑽孔的第一筆資料
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[0]),
                         "lower_depth_major": (major_position, lower_depth_major[0]),
@@ -297,7 +357,29 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
                         "soil_type": soil_type_minor[idx],
                     })
+                    upper_limit= (lower_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2).round(2)
+                    lower_limit= (lower_depth_major[0] * weight_1 + lower_depth_minor[idx] * weight_2).round(2)
+                    predict_borehole['Upper Depth'] = upper_limit
+                    predict_borehole['Lower Depth'] = lower_limit
+                    predict_borehole['Type'] = soil_type_minor[idx]
+                    data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
+                    depth_2 = data_2_picked['Depth (m)']
+                    qc_2 = data_2_picked['qc (MPa)']
+                    fs_2 = data_2_picked['fs (MPa)']
+                    u_2 = data_2_picked['u (MPa)']
+                    type_2 = data_2_picked['合併後']
+                    num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    for i in range(num_steps):
+                        if i < len(depth_2):
+                            depth = 0.02 * i + upper_limit
+                            qc = qc_2.iloc[i]
+                            fs = fs_2.iloc[i]
+                            u = u_2.iloc[i]
+                            soil_type = type_2.iloc[i]
+                            new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                            predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
                     matched_layers_minor.add(idx)
+                    # 再處理主鑽孔的第一筆資料
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[idx]),
                         "lower_depth_major": (major_position, lower_depth_major[idx]),
@@ -313,6 +395,27 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_major[0]))],
                         "soil_type": soil_type_minor[0],
                     })
+                    upper_limit= (upper_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2).round(2)
+                    lower_limit= (lower_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2).round(2)
+                    predict_borehole['Upper Depth'] = upper_limit
+                    predict_borehole['Lower Depth'] = lower_limit
+                    predict_borehole['Type'] = soil_type_minor[0]
+                    data_1_picked = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
+                    depth_1 = data_1_picked['Depth (m)']
+                    qc_1 = data_1_picked['qc (MPa)']
+                    fs_1 = data_1_picked['fs (MPa)']
+                    u_1 = data_1_picked['u (MPa)']
+                    type_1 = data_1_picked['合併後']
+                    num_steps = int((lower_limit - upper_limit) / 0.02)
+                    for i in range(num_steps):
+                        if i < len(depth_1):
+                            depth = 0.02 * i + upper_limit
+                            qc = qc_1.iloc[i]
+                            fs = fs_1.iloc[i]
+                            u = u_1.iloc[i]
+                            soil_type = type_1.iloc[i]
+                            new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                            predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
                     matched_layers_major.add(idx)
 
                     
@@ -333,6 +436,27 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_major[0]))],
                         "soil_type": soil_type_major[0],
                     })
+                    upper_limit= (upper_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2).round(2)
+                    lower_limit= (lower_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2).round(2)
+                    predict_borehole['Upper Depth'] = upper_limit
+                    predict_borehole['Lower Depth'] = lower_limit
+                    predict_borehole['Type'] = soil_type_major[0]
+                    data_1_picked = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
+                    depth_1 = data_1_picked['Depth (m)']
+                    qc_1 = data_1_picked['qc (MPa)']
+                    fs_1 = data_1_picked['fs (MPa)']
+                    u_1 = data_1_picked['u (MPa)']
+                    type_1 = data_1_picked['合併後']
+                    num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    for i in range(num_steps):
+                        if i < len(depth_1):
+                            depth = 0.02 * i + upper_limit
+                            qc = qc_1.iloc[i]
+                            fs = fs_1.iloc[i]
+                            u = u_1.iloc[i]
+                            soil_type = type_1.iloc[i]
+                            new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                            predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
                     matched_layers_major.add(0)
                     layers.append({
                         "upper_depth_major": (major_position, lower_depth_major[idx]),
@@ -349,6 +473,27 @@ for depth_range in depth_ranges:
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
                         "soil_type": soil_type_major[idx],
                     })
+                    upper_limit= (lower_depth_major[idx] * weight_1 + upper_depth_minor[0] * weight_2).round(2)
+                    lower_limit= (lower_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2).round(2)
+                    predict_borehole['Upper Depth'] = upper_limit
+                    predict_borehole['Lower Depth'] = lower_limit
+                    predict_borehole['Type'] = soil_type_major[idx]
+                    data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
+                    depth_2 = data_2_picked['Depth (m)']
+                    qc_2 = data_2_picked['qc (MPa)']
+                    fs_2 = data_2_picked['fs (MPa)']
+                    u_2 = data_2_picked['u (MPa)']
+                    type_2 = data_2_picked['合併後']
+                    num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    for i in range(num_steps):
+                        if i < len(depth_2):
+                            depth = 0.02 * i + upper_limit
+                            qc = qc_2.iloc[i]
+                            fs = fs_2.iloc[i]
+                            u = u_2.iloc[i]
+                            soil_type = type_2.iloc[i]
+                            new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                            predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
                     matched_layers_minor.add(idx)
 
         for i in include:
@@ -368,6 +513,27 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_minor[i]))],
                 "soil_type": soil_type_minor[i],
             })
+            upper_limit= (upper_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2).round(2)
+            lower_limit= (upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2).round(2)
+            predict_borehole['Upper Depth'] = upper_limit
+            predict_borehole['Lower Depth'] = lower_limit
+            predict_borehole['Type'] = soil_type_minor[i]
+            data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
+            depth_2 = data_2_picked['Depth (m)']
+            qc_2 = data_2_picked['qc (MPa)']
+            fs_2 = data_2_picked['fs (MPa)']
+            u_2 = data_2_picked['u (MPa)']
+            type_2 = data_2_picked['合併後']
+            num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+            for i in range(num_steps):
+                if i < len(depth_2):
+                    depth = 0.02 * i + upper_limit
+                    qc = qc_2.iloc[i]
+                    fs = fs_2.iloc[i]
+                    u = u_2.iloc[i]
+                    soil_type = type_2.iloc[i]
+                    new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                    predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
             matched_layers_minor.add(i)
     # 匹配剩下的
     for i in range(len(minor_section)):
@@ -387,10 +553,29 @@ for depth_range in depth_ranges:
                 "color": color_mapping[str(int(soil_type_minor[i]))],
                 "soil_type": soil_type_minor[i],
             })
+            upper_limit= (lower_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2).round(2)
+            lower_limit= (lower_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2).round(2)
+            predict_borehole['Upper Depth'] = upper_limit
+            predict_borehole['Lower Depth'] = lower_limit
+            predict_borehole['Type'] = soil_type_minor[i]
+            data_2_picked = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
+            depth_2 = data_2_picked['Depth (m)']
+            qc_2 = data_2_picked['qc (MPa)']
+            fs_2 = data_2_picked['fs (MPa)']
+            u_2 = data_2_picked['u (MPa)']
+            type_2 = data_2_picked['合併後']
+            num_steps = int((lower_limit - upper_limit) / 0.02) + 1
+            for i in range(num_steps):
+                if i < len(depth_2):
+                    depth = 0.02 * i + upper_limit
+                    qc = qc_2.iloc[i]
+                    fs = fs_2.iloc[i]
+                    u = u_2.iloc[i]
+                    soil_type = type_2.iloc[i]
+                    new_row = pd.DataFrame([{'Depth (m)': depth, 'qc (MPa)': qc, 'fs (MPa)': fs, 'u (MPa)': u, 'Soil type': soil_type}])
+                    predict_borehole_data = pd.concat([predict_borehole_data, new_row], ignore_index=True)
             matched_layers_minor.add(idx)
-    # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
-    last_major_lower_depth = lower_depth_major[idx]
-    last_minor_lower_depth = lower_depth_minor[i]
+
 
 
 
@@ -414,7 +599,10 @@ predict_borehole['Lower Depth'] = (
 
 
 
-predict_borehole_data = pd.DataFrame()
+# 儲存預測的鑽孔資料
+predict_borehole_data.to_excel('predict_borehole_data.xlsx', index=False)
+print('預測的鑽孔資料已儲存')
+
 
 
 
