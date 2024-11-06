@@ -82,7 +82,6 @@ for i in range(2):
 # 如果需要分別讀取第一和第二個檔案
 df_1 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[0]), processed_files[0])
 df_2 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[1]), processed_files[1])
-
 # 儲存一份processed_files.xlsx
 data_1 = pd.read_excel(processed_files[0])
 data_2 = pd.read_excel(processed_files[1])
@@ -95,7 +94,6 @@ borehole_position_2 = 1580.53
 weight_1 = 0.5
 weight_2 = 0.5
 
-depth = 0
 # 定義顏色映射
 color_mapping = {
     '1': 'lightsalmon',
@@ -119,18 +117,15 @@ predict_borehole_data = pd.DataFrame({
     'Soil type': pd.Series(dtype='object')
 })
 
-depth_ranges = [(0, 60),(60,80),(80,110)]  # 定義深度區間
-
-last_major_lower_depth = 0
-last_minor_lower_depth = 0
+depth_ranges = [(0,60),(60,80),(80,110)]  # 定義深度區間
 
 previous_section_1 = None
 previous_section_2 = None
 data = []
-
+depth = 0.02
 # 對比兩個文件的深度區間尋找相近Ic
 for depth_range in depth_ranges:
-    
+
     start_depth, end_depth = depth_range
     matched_layers_major = set()
     matched_layers_minor = set()
@@ -158,7 +153,7 @@ for depth_range in depth_ranges:
             section_df_2 = pd.concat([section_df_2, next_row_2.iloc[[0]]], ignore_index=True)
 
 
-# 刪除與上一區間重複的資料
+    # 刪除與上一區間重複的資料
     if previous_section_1 is not None:
         # 使用merge找出重複的行
         duplicates_1 = pd.merge(section_df_1, previous_section_1, how='inner')
@@ -176,7 +171,8 @@ for depth_range in depth_ranges:
     # 重置索引
     section_df_1 = section_df_1.reset_index(drop=True)
     section_df_2 = section_df_2.reset_index(drop=True)
-
+    print(section_df_1)
+    print(section_df_2)
     
     # 保存當前區間的數據作為下一次迭代的previous
     previous_section_1 = section_df_1.copy()
@@ -237,12 +233,6 @@ for depth_range in depth_ranges:
                 "lower_depth_major": (major_position, lower_depth_major[idx]),
                 "upper_depth_minor": (minor_position, upper_depth_minor[match_layer]),
                 "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
-                "points": [
-                    (major_position, upper_depth_major[idx]),
-                    (major_position, lower_depth_major[idx]),
-                    (minor_position, lower_depth_minor[match_layer]),
-                    (minor_position, upper_depth_minor[match_layer]),
-                ],
                 "label": soil_type_major[idx],
                 "color": color_mapping[str(int(soil_type_major[idx]))],
                 "soil_type": soil_type_major[idx],
@@ -251,38 +241,50 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = upper_depth_major[idx] * weight_1 + upper_depth_minor[match_layer] * weight_2
             lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
+            upper_limit = round(upper_limit, 2)
+            lower_limit = round(lower_limit, 2)
             print('upper_limit', upper_limit)
             print('lower_limit', lower_limit)
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            print('steps:', steps)
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+
+            # 初始化變數
+            x = 0
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                    }
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
+                    }
+                elif row_minor is not None and row_major is None:
+                    # 僅使用 row_minor 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
+                    }
+
+                # 更新索引和深度
+                x += 1
                 depth += 0.02
-                if x < len(data_major) and x < len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                    }
-                elif x > len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                    }
-                elif x > len(data_major):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                    }
                 data.append(row)
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
@@ -296,52 +298,59 @@ for depth_range in depth_ranges:
                     "lower_depth_major": (major_position, lower_depth_major[idx]),
                     "upper_depth_minor": (minor_position, lower_depth_minor[match_layer]),
                     "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
-                    "points": [
-                        (major_position, upper_depth_major[idx]),
-                        (major_position, lower_depth_major[idx]),
-                        (minor_position, lower_depth_minor[match_layer]),
-                        (minor_position, lower_depth_minor[match_layer]),
-                    ],
                     "label": soil_type_major[idx],
                     "color": color_mapping[str(int(soil_type_major[idx]))],
                     "soil_type": soil_type_major[idx],
                 })
                 # 預測predict_borehole_data的數據
                 # 取用layers的數據
-                upper_limit = upper_depth_major[idx] * weight_1 + upper_depth_minor[match_layer] * weight_2
+                upper_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
                 lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
+                upper_limit = round(upper_limit, 2)
+                lower_limit = round(lower_limit, 2)
                 print('upper_limit', upper_limit)
                 print('lower_limit', lower_limit)
-                steps = int((lower_limit - upper_limit) / 0.02) + 1
-                print('steps:', steps)
-                # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-                # 使用layers的數據
+               
                 data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                 data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                # 初始化一個空列表來儲存資料
-                for x in range(steps):
+                # 初始化變數
+                x = 0
+
+                # 遍歷深度範圍
+                while depth < lower_limit:
+                    # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                    row_major = data_major.iloc[x] if x < len(data_major) else None
+                    row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                    # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                    if row_major is not None and row_minor is not None:
+                        # 合併數據
+                        row = {
+                            'Depth (m)': depth,
+                            'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                            'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                            'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                        }
+                    elif row_major is not None and row_minor is None:
+                        # 僅使用 row_major 的數據
+                        row = {
+                            'Depth (m)': depth,
+                            'qc (MPa)': row_major.iloc[1],
+                            'fs (MPa)': row_major.iloc[2],
+                            'u (MPa)': row_major.iloc[3],
+                        }
+                    elif row_minor is not None and row_major is None:
+                        # 僅使用 row_minor 的數據
+                        row = {
+                            'Depth (m)': depth,
+                            'qc (MPa)': row_minor.iloc[1],
+                            'fs (MPa)': row_minor.iloc[2],
+                            'u (MPa)': row_minor.iloc[3],
+                        }
+
+                    # 更新索引和深度
+                    x += 1
                     depth += 0.02
-                    if x < len(data_major) and x < len(data_minor):
-                        row = {
-                            'Depth (m)': depth,
-                            'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                            'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                            'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                        }
-                    elif x > len(data_minor):
-                        row = {
-                            'Depth (m)': depth,
-                            'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                            'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                            'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                        }
-                    elif x > len(data_major):
-                        row = {
-                            'Depth (m)': depth,
-                            'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                            'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                            'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                        }
                     data.append(row)
                 matched_layers_major.add(idx)
 
@@ -361,37 +370,49 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = upper_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2
                     lower_limit = lower_depth_major[0] * weight_1 + lower_depth_minor[idx] * weight_2
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
                     print('upper_limit', upper_limit)
                     print('lower_limit', lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
-                    print('steps:', steps)
-                    # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-                    # 使用layers的數據
+                        
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
+                    # 初始化變數
+                    x = 0
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                            }
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
+                            }
+                        elif row_minor is not None and row_major is None:
+                            # 僅使用 row_minor 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
+                            }
+                        # 更新索引和深度
+                        x += 1
                         depth += 0.02
-                        if x < len(data_major) and x < len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                            }
-                        elif x > len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                            }
-                        elif x > len(data_major):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                            }
                         data.append(row)
                     matched_layers_minor.add(idx)
 
@@ -408,39 +429,53 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2
                     lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
                     print('upper_limit', upper_limit)
                     print('lower_limit', lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
-                    print('steps:', steps)
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                            }
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
+                            }
+                        elif row_minor is not None and row_major is None:
+                            # 僅使用 row_minor 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
+                            }
+
+                        # 更新索引和深度
+                        x += 1
                         depth += 0.02
-                        if x < len(data_major) and x < len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                            }
-                        elif x > len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                            }
-                        elif x > len(data_major):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
-                            }
                         data.append(row)
                     matched_layers_major.add(idx)
 
@@ -460,38 +495,52 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = upper_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2
                     lower_limit = lower_depth_major[0] * weight_1 + upper_depth_minor[idx] * weight_2
-                    print('upper_limit', upper_limit)
-                    print('lower_limit', lower_limit)
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
-                    print('steps:', steps)
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                            }
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
+                            }
+                        elif row_minor is not None and row_major is  None:
+                            # 僅使用 row_minor 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
+                            }
+
+                        # 更新索引和深度
+                        x += 1
                         depth += 0.02
-                        if x < len(data_major) and x < len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                            }
-                        elif x > len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                            }
-                        elif x > len(data_major):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                            }
                         data.append(row)
                     matched_layers_major.add(0)
 
@@ -508,38 +557,51 @@ for depth_range in depth_ranges:
                     # 取用layers的數據
                     upper_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[0] * weight_2
                     lower_limit = lower_depth_major[idx] * weight_1 + upper_depth_minor[0] * weight_2
-                    print('upper_limit', upper_limit)
-                    print('lower_limit', lower_limit)
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
                     steps = int((lower_limit - upper_limit) / 0.02) + 1
-                    print('steps:', steps)
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                            }
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
+                            }
+                        elif row_minor is not None and row_major is  None:
+                            # 僅使用 row_minor 的數據
+                            row = {
+                                'Depth (m)': depth,
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
+                            }
+                        # 更新索引和深度
+                        x += 1
                         depth += 0.02
-                        if x < len(data_major) and x < len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                            }
-                        elif x > len(data_minor):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                            }
-                        elif x > len(data_major):
-                            row = {
-                                'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                            }
                         data.append(row)
                     matched_layers_minor.add(idx)
 
@@ -558,38 +620,50 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = upper_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2
             lower_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
-            print('upper_limit', upper_limit)
-            print('lower_limit', lower_limit)
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            print('steps:', steps)
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+            upper_limit = round(upper_limit, 2)
+            lower_limit = round(lower_limit, 2)
+            print(upper_limit, lower_limit)
+
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
+            # 初始化變數
+            x = 0
+
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                    }
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
+                    }
+                elif row_minor is not None and row_major is  None:
+                    # 僅使用 row_minor 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
+                    }
+
+                # 更新索引和深度
+                x += 1
                 depth += 0.02
-                if x < len(data_major) and x < len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                    }
-                elif x > len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                    }
-                elif x > len(data_major):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                    }
                 data.append(row)
             matched_layers_minor.add(i)
     # 匹配剩下的
@@ -608,44 +682,54 @@ for depth_range in depth_ranges:
             # 取用layers的數據
             upper_limit = lower_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2
             lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
-            print('upper_limit', upper_limit)
-            print('lower_limit', lower_limit)
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            print('steps:', steps)
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+            upper_limit = round(upper_limit, 2)
+            lower_limit = round(lower_limit, 2)
+            
+            print(upper_limit, lower_limit)
+
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
+            # 初始化變數
+            x = 0
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
+                    }
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
+                    }
+                elif row_minor is not None and row_major is  None:
+                    # 僅使用 row_minor 的數據
+                    row = {
+                        'Depth (m)': depth,
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
+                    }
+
+                # 更新索引和深度
+                x += 1
                 depth += 0.02
-                if x < len(data_major) and x < len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                    }
-                elif x > len(data_minor):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                    }
-                elif x > len(data_major):
-                    row = {
-                        'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                    }
                 data.append(row)
             matched_layers_minor.add(idx)
     # 最後一次性轉換為 DataFrame
     predict_borehole_data = pd.DataFrame(data)
-    # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
-    last_major_lower_depth = lower_depth_major[idx]
-    last_minor_lower_depth = lower_depth_minor[i]
 
 
 
