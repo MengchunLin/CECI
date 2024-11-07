@@ -122,7 +122,7 @@ depth_ranges = [(0,60),(60,80),(80,110)]  # 定義深度區間
 previous_section_1 = None
 previous_section_2 = None
 data = []
-depth = 0.02
+last_depth = 0
 # 對比兩個文件的深度區間尋找相近Ic
 for depth_range in depth_ranges:
 
@@ -245,7 +245,11 @@ for depth_range in depth_ranges:
             lower_limit = round(lower_limit, 2)
             print('upper_limit', upper_limit)
             print('lower_limit', lower_limit)
-
+            depth = upper_limit
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
             # 初始化變數
             x = 0
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
@@ -284,8 +288,10 @@ for depth_range in depth_ranges:
 
                 # 更新索引和深度
                 x += 1
+                last_depth = depth
                 depth += 0.02
                 data.append(row)
+                
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
 
@@ -310,7 +316,11 @@ for depth_range in depth_ranges:
                 lower_limit = round(lower_limit, 2)
                 print('upper_limit', upper_limit)
                 print('lower_limit', lower_limit)
-               
+                depth = upper_limit
+                if depth - last_depth >= 0.02:
+                    print('不改變深度', depth)
+                else:
+                    depth = depth + 0.01
                 data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                 data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                 # 初始化變數
@@ -350,8 +360,10 @@ for depth_range in depth_ranges:
 
                     # 更新索引和深度
                     x += 1
+                    last_depth = depth
                     depth += 0.02
                     data.append(row)
+                    
                 matched_layers_major.add(idx)
 
             else:
@@ -374,7 +386,11 @@ for depth_range in depth_ranges:
                     lower_limit = round(lower_limit, 2)
                     print('upper_limit', upper_limit)
                     print('lower_limit', lower_limit)
-                        
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
                     # 初始化變數
@@ -412,8 +428,10 @@ for depth_range in depth_ranges:
                             }
                         # 更新索引和深度
                         x += 1
+                        last_depth = depth
                         depth += 0.02
                         data.append(row)
+                        
                     matched_layers_minor.add(idx)
 
                     layers.append({
@@ -433,7 +451,12 @@ for depth_range in depth_ranges:
                     lower_limit = round(lower_limit, 2)
                     print('upper_limit', upper_limit)
                     print('lower_limit', lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
@@ -475,8 +498,10 @@ for depth_range in depth_ranges:
 
                         # 更新索引和深度
                         x += 1
+                        last_depth = depth
                         depth += 0.02
                         data.append(row)
+                        
                     matched_layers_major.add(idx)
 
                     
@@ -498,7 +523,11 @@ for depth_range in depth_ranges:
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
                     print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
@@ -540,8 +569,10 @@ for depth_range in depth_ranges:
 
                         # 更新索引和深度
                         x += 1
+                        last_depth = depth
                         depth += 0.02
                         data.append(row)
+                        
                     matched_layers_major.add(0)
 
                     layers.append({
@@ -560,7 +591,11 @@ for depth_range in depth_ranges:
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
                     print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
@@ -601,8 +636,10 @@ for depth_range in depth_ranges:
                             }
                         # 更新索引和深度
                         x += 1
+                        last_depth = depth
                         depth += 0.02
                         data.append(row)
+                        
                     matched_layers_minor.add(idx)
 
         for i in include:
@@ -623,7 +660,11 @@ for depth_range in depth_ranges:
             upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
             print(upper_limit, lower_limit)
-
+            depth = upper_limit
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 初始化變數
@@ -665,6 +706,7 @@ for depth_range in depth_ranges:
                 x += 1
                 depth += 0.02
                 data.append(row)
+                last_depth = depth
             matched_layers_minor.add(i)
     # 匹配剩下的
     for i in range(len(minor_section)):
@@ -686,7 +728,11 @@ for depth_range in depth_ranges:
             lower_limit = round(lower_limit, 2)
             
             print(upper_limit, lower_limit)
-
+            depth = upper_limit
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
             # 初始化變數
@@ -725,11 +771,15 @@ for depth_range in depth_ranges:
 
                 # 更新索引和深度
                 x += 1
+                last_depth = depth
                 depth += 0.02
                 data.append(row)
+                
             matched_layers_minor.add(idx)
     # 最後一次性轉換為 DataFrame
     predict_borehole_data = pd.DataFrame(data)
+# 把predict_borehole_data的順序改為Depth (m)由小到大
+predict_borehole_data = predict_borehole_data.sort_values(by='Depth (m)', ascending=True)
 
 
 
