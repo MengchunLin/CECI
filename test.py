@@ -780,6 +780,8 @@ for depth_range in depth_ranges:
     predict_borehole_data = pd.DataFrame(data)
 # 把predict_borehole_data的順序改為Depth (m)由小到大
 predict_borehole_data = predict_borehole_data.sort_values(by='Depth (m)', ascending=True)
+# 刪掉重複的數據
+predict_borehole_data = predict_borehole_data.drop_duplicates(subset='Depth (m)', keep='first')
 
 
 
