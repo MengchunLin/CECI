@@ -220,11 +220,11 @@ for depth_range in depth_ranges:
                     match_layer = idx + i
                     flag = True
 
-
-        # 刪除include裡<match_layer的數字
-        for i in range(idx, match_layer):
-            if i not in matched_layers_minor:
-                include.append(i)
+        # 找深度在match_layer之前未匹配的土層-------
+        for i in range(0, match_layer):
+            if i < len(minor_section):
+                if i not in matched_layers_minor:
+                    include.append(i)
 
         # 匹配match_layer
         if flag:
@@ -643,7 +643,7 @@ for depth_range in depth_ranges:
                     matched_layers_minor.add(idx)
 
         for i in include:
-
+            print('include', i)
             layers.append({
                 "upper_depth_major": (major_position, upper_depth_major[idx]),
                 "lower_depth_major": (major_position, upper_depth_major[idx]),
