@@ -24,6 +24,8 @@ def get_thickness_threshold():
 
 # 分類土壤類型
 def classify_soil_type(Ic):
+    # 把Ic轉為float
+
     Ic = round(Ic, 2)
     if Ic <= 2.05:
         return 1
@@ -126,6 +128,8 @@ def process_file(file, thickness_threshold):
     df_copy = df.copy()
 
     # 資料處理
+    # 把Ic轉為float
+    df_copy['Ic'] = df_copy['Ic'].replace(' ', 0).astype(float)
     df_copy['Ic'] = df_copy['Ic'].interpolate(method='linear')
     df_copy['Soil Type'] = df_copy['Soil Type'].ffill()
 
