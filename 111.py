@@ -117,18 +117,17 @@ predict_borehole_data = pd.DataFrame({
     'Soil type': pd.Series(dtype='object')
 })
 
-depth_ranges = [(0, 20),(20,60),(60,80),(80,110)]  # 定義深度區間
-
-last_major_lower_depth = 0
-last_minor_lower_depth = 0
+depth_ranges = [(0,60),(60,80),(80,110)]  # 定義深度區間
 
 previous_section_1 = None
 previous_section_2 = None
 data = []
-
+last_depth = 0
+previous_depth_major = 0
+previous_depth_minor = 0
 # 對比兩個文件的深度區間尋找相近Ic
 for depth_range in depth_ranges:
-    
+
     start_depth, end_depth = depth_range
     matched_layers_major = set()
     matched_layers_minor = set()
@@ -156,7 +155,7 @@ for depth_range in depth_ranges:
             section_df_2 = pd.concat([section_df_2, next_row_2.iloc[[0]]], ignore_index=True)
 
 
-# 刪除與上一區間重複的資料
+    # 刪除與上一區間重複的資料
     if previous_section_1 is not None:
         # 使用merge找出重複的行
         duplicates_1 = pd.merge(section_df_1, previous_section_1, how='inner')
@@ -174,6 +173,8 @@ for depth_range in depth_ranges:
     # 重置索引
     section_df_1 = section_df_1.reset_index(drop=True)
     section_df_2 = section_df_2.reset_index(drop=True)
+    print(section_df_1)
+    print(section_df_2)
     
     # 保存當前區間的數據作為下一次迭代的previous
     previous_section_1 = section_df_1.copy()
@@ -221,11 +222,11 @@ for depth_range in depth_ranges:
                     match_layer = idx + i
                     flag = True
 
-
-        # 刪除include裡<match_layer的數字
-        for i in range(idx, match_layer):
-            if i not in matched_layers_minor:
-                include.append(i)
+        # 找深度在match_layer之前未匹配的土層-------
+        for i in range(0, match_layer):
+            if i < len(minor_section):
+                if i not in matched_layers_minor:
+                    include.append(i)
 
         # 匹配match_layer
         if flag:
@@ -234,58 +235,68 @@ for depth_range in depth_ranges:
                 "lower_depth_major": (major_position, lower_depth_major[idx]),
                 "upper_depth_minor": (minor_position, upper_depth_minor[match_layer]),
                 "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
-                "points": [
-                    (major_position, upper_depth_major[idx]),
-                    (major_position, lower_depth_major[idx]),
-                    (minor_position, lower_depth_minor[match_layer]),
-                    (minor_position, upper_depth_minor[match_layer]),
-                ],
                 "label": soil_type_major[idx],
                 "color": color_mapping[str(int(soil_type_major[idx]))],
                 "soil_type": soil_type_major[idx],
             })
             # 預測predict_borehole_data的數據
             # 取用layers的數據
-            upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-            lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+            upper_limit = upper_depth_major[idx] * weight_1 + upper_depth_minor[match_layer] * weight_2
+            lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
             upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
-            
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+            print('upper_limit', upper_limit)
+            print('lower_limit', lower_limit)
+            depth = upper_limit
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
+            # 初始化變數
+            x = 0
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
-                depth = upper_limit + 0.02 * x
-                if x < len(data_major) and i < len(data_minor):
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                     }
-                elif x < len(data_major):
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
                     }
-                elif x < len(data_minor):
+                elif row_minor is not None and row_major is None:
+                    # 僅使用 row_minor 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
                     }
+
+                # 更新索引和深度
+                x += 1
+                last_depth = depth
+                depth += 0.02
                 data.append(row)
+                
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
+            print('flag add', matched_layers_minor)
 
 
         
@@ -296,419 +307,534 @@ for depth_range in depth_ranges:
                     "lower_depth_major": (major_position, lower_depth_major[idx]),
                     "upper_depth_minor": (minor_position, lower_depth_minor[match_layer]),
                     "lower_depth_minor": (minor_position, lower_depth_minor[match_layer]),
-                    "points": [
-                        (major_position, upper_depth_major[idx]),
-                        (major_position, lower_depth_major[idx]),
-                        (minor_position, lower_depth_minor[match_layer]),
-                        (minor_position, lower_depth_minor[match_layer]),
-                    ],
                     "label": soil_type_major[idx],
                     "color": color_mapping[str(int(soil_type_major[idx]))],
                     "soil_type": soil_type_major[idx],
                 })
                 # 預測predict_borehole_data的數據
                 # 取用layers的數據
-                upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-                lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+                upper_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
+                lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
                 upper_limit = round(upper_limit, 2)
                 lower_limit = round(lower_limit, 2)
-                
-                print(upper_limit, lower_limit)
-                steps = int((lower_limit - upper_limit) / 0.02) + 1
-                # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-                # 使用layers的數據
+                print('upper_limit', upper_limit)
+                print('lower_limit', lower_limit)
+                depth = upper_limit
+                if depth - last_depth >= 0.02:
+                    print('不改變深度', depth)
+                else:
+                    depth = depth + 0.01
                 data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                 data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                # 初始化一個空列表來儲存資料
-                for x in range(steps):
-                    depth = upper_limit + 0.02 * x
-                    if x < len(data_major) and i < len(data_minor):
+                # 初始化變數
+                x = 0
+
+                # 遍歷深度範圍
+                while depth < lower_limit:
+                    # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                    row_major = data_major.iloc[x] if x < len(data_major) else None
+                    row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                    # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                    if row_major is not None and row_minor is not None:
+                        # 合併數據
                         row = {
                             'Depth (m)': depth,
-                            'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                            'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                            'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                            'Soil type': soil_type_major[idx],
+                            'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                            'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                            'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                         }
-                    elif x < len(data_major):
+                    elif row_major is not None and row_minor is None:
+                        # 僅使用 row_major 的數據
                         row = {
                             'Depth (m)': depth,
-                            'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                            'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                            'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                            'Soil type': soil_type_major[idx],
+                            'qc (MPa)': row_major.iloc[1],
+                            'fs (MPa)': row_major.iloc[2],
+                            'u (MPa)': row_major.iloc[3],
                         }
-                    elif x < len(data_minor):
+                    elif row_minor is not None and row_major is None:
+                        # 僅使用 row_minor 的數據
                         row = {
                             'Depth (m)': depth,
-                            'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                            'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                            'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                            'Soil type': soil_type_major[idx],
+                            'qc (MPa)': row_minor.iloc[1],
+                            'fs (MPa)': row_minor.iloc[2],
+                            'u (MPa)': row_minor.iloc[3],
                         }
+
+                    # 更新索引和深度
+                    x += 1
+                    last_depth = depth
+                    depth += 0.02
                     data.append(row)
+                    
                 matched_layers_major.add(idx)
 
             else:
                 # 當主鑽孔第一筆資料的upper_depth_1小於副鑽孔第一筆資料的upper_depth_2
-                if upper_depth_minor[idx] < upper_depth_major[0]:
+                if lower_depth_minor[0] < lower_depth_major[0]:
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[0]),
                         "lower_depth_major": (major_position, lower_depth_major[0]),
-                        "upper_depth_minor": (minor_position, upper_depth_minor[idx]),
-                        "lower_depth_minor": (minor_position, lower_depth_minor[idx]),
-                        "points": [
-                            (major_position, lower_depth_major[0]),
-                            (major_position, lower_depth_major[0]),
-                            (minor_position, lower_depth_minor[idx]),
-                            (minor_position, upper_depth_minor[idx]),
-                        ],
-                        "label": soil_type_minor[idx],
-                        "color": color_mapping[str(int(soil_type_minor[idx]))],
+                        "upper_depth_minor": (minor_position, lower_depth_minor[0]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[0]),
+                        "label": soil_type_major[0],
+                        "color": color_mapping[str(int(soil_type_major[0]))],
                         "soil_type": soil_type_minor[idx],
                     })
                     # 預測predict_borehole_data的數據
                     # 取用layers的數據
-                    upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-                    lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+                    upper_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
+                    lower_limit = lower_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    
-                    print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
-                    # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-                    # 使用layers的數據
+                    print('upper_limit', upper_limit)
+                    print('lower_limit', lower_limit)
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
-                        depth = upper_limit + 0.02 * x
-                        if x < len(data_major) and i < len(data_minor):
+                    # 初始化變數
+                    x = 0
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                             }
-                        elif x < len(data_major):
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
                             }
-                        elif x < len(data_minor):
+                        elif row_minor is not None and row_major is None:
+                            # 僅使用 row_minor 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
                             }
+                        # 更新索引和深度
+                        x += 1
+                        last_depth = depth
+                        depth += 0.02
                         data.append(row)
-                    matched_layers_minor.add(idx)
+                        
+                    matched_layers_major.add(idx)
 
                     layers.append({
-                        "upper_depth_major": (major_position, upper_depth_major[idx]),
-                        "lower_depth_major": (major_position, lower_depth_major[idx]),
-                        "upper_depth_minor": (minor_position, lower_depth_minor[0]),
+                        "upper_depth_major": (major_position, upper_depth_major[0]),
+                        "lower_depth_major": (major_position, upper_depth_major[0]),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[0]),
                         "lower_depth_minor": (minor_position, lower_depth_minor[0]),
-                        "points": [
-                            (major_position, upper_depth_major[idx]),
-                            (major_position, lower_depth_major[idx]),
-                            (minor_position, lower_depth_minor[0]),
-                            (minor_position, lower_depth_minor[0]),
-                        ],
                         "label": soil_type_minor[0],
-                        "color": color_mapping[str(int(soil_type_major[0]))],
+                        "color": color_mapping[str(int(soil_type_minor[0]))],
                         "soil_type": soil_type_minor[0],
                     })
                     # 預測predict_borehole_data的數據
                     # 取用layers的數據
-                    upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-                    lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+                    upper_limit = upper_depth_major[0] * weight_1 + upper_depth_minor[0] * weight_2
+                    lower_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                
-                    print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    print('upper_limit', upper_limit)
+                    print('lower_limit', lower_limit)
+                    
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
-                        depth = upper_limit + 0.02 * x
-                        if x < len(data_major) and i < len(data_minor):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                             }
-                        elif x < len(data_major):
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
                             }
-                        elif x < len(data_minor):
+                        elif row_minor is not None and row_major is None:
+                            # 僅使用 row_minor 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
                             }
+
+                        # 更新索引和深度
+                        x += 1
+                        last_depth = depth
+                        depth += 0.02
                         data.append(row)
-                    matched_layers_major.add(idx)
+                        
+                    matched_layers_minor.add(idx)
+                    print('not flag add', matched_layers_minor)
 
                     
                 # 當副鑽孔的深度大於主鑽孔的深度
-                elif upper_depth_minor[idx] > upper_depth_major[0]:
+                elif lower_depth_minor[0] > lower_depth_major[0]:
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[0]),
-                        "lower_depth_major": (major_position, lower_depth_major[0]),
-                        "upper_depth_minor": (minor_position, upper_depth_minor[idx]),
-                        "lower_depth_minor": (minor_position, upper_depth_minor[idx]),
-                        "points": [
-                            (major_position, upper_depth_major[0]),
-                            (major_position, lower_depth_major[0]),
-                            (minor_position, upper_depth_minor[idx]),
-                            (minor_position, upper_depth_minor[idx]),
-                        ],
+                        "lower_depth_major": (major_position, upper_depth_major[0]),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[0]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[0]),
                         "label": soil_type_major[0],
                         "color": color_mapping[str(int(soil_type_major[0]))],
                         "soil_type": soil_type_major[0],
                     })
                                         # 預測predict_borehole_data的數據
                     # 取用layers的數據
-                    upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-                    lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+                    upper_limit = upper_depth_major[0] * weight_1 + upper_depth_minor[0] * weight_2
+                    lower_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
                     print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
-                        depth = upper_limit + 0.02 * x
-                        if x < len(data_major) and i < len(data_minor):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                             }
-                        elif x < len(data_major):
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
                             }
-                        elif x < len(data_minor):
+                        elif row_minor is not None and row_major is  None:
+                            # 僅使用 row_minor 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
                             }
+
+                        # 更新索引和深度
+                        x += 1
+                        last_depth = depth
+                        depth += 0.02
                         data.append(row)
-                    matched_layers_major.add(0)
+                        
+                    matched_layers_minor.add(0)
+                    print('not flag add', matched_layers_minor)
 
                     layers.append({
-                        "upper_depth_major": (major_position, lower_depth_major[idx]),
-                        "lower_depth_major": (major_position, lower_depth_major[idx]),
+                        "upper_depth_major": (major_position, upper_depth_major[0]),
+                        "lower_depth_major": (major_position, lower_depth_major[0]),
                         "upper_depth_minor": (minor_position, lower_depth_minor[0]),
-                        "lower_depth_minor": (minor_position, upper_depth_minor[0]),
-                        "points": [
-                            (major_position, lower_depth_major[idx]),
-                            (major_position, lower_depth_major[idx]),
-                            (minor_position, upper_depth_minor[0]),
-                            (minor_position, lower_depth_minor[0]),
-                        ],
+                        "lower_depth_minor": (minor_position, lower_depth_minor[0]),
                         "label": soil_type_major[idx],
                         "color": color_mapping[str(int(soil_type_minor[idx]))],
                         "soil_type": soil_type_major[idx],
                     })
                                         # 預測predict_borehole_data的數據
                     # 取用layers的數據
-                    upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-                    lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+                    upper_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
+                    lower_limit = lower_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
                     print(upper_limit, lower_limit)
-                    steps = int((lower_limit - upper_limit) / 0.02) + 1
+                    depth = upper_limit
+                    if depth - last_depth >= 0.02:
+                        print('不改變深度', depth)
+                    else:
+                        depth = depth + 0.01
                     # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
                     # 使用layers的數據
                     data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
                     data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-                    # 初始化一個空列表來儲存資料
-                    for x in range(steps):
-                        depth = upper_limit + 0.02 * x
-                        if x < len(data_major) and i < len(data_minor):
+                    # 初始化變數
+                    x = 0
+
+                    # 遍歷深度範圍
+                    while depth < lower_limit:
+                        # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                        row_major = data_major.iloc[x] if x < len(data_major) else None
+                        row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                        # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                        if row_major is not None and row_minor is not None:
+                            # 合併數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                                'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                                'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                                'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                                'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                             }
-                        elif x < len(data_major):
+                        elif row_major is not None and row_minor is None:
+                            # 僅使用 row_major 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_major.iloc[1],
+                                'fs (MPa)': row_major.iloc[2],
+                                'u (MPa)': row_major.iloc[3],
                             }
-                        elif x < len(data_minor):
+                        elif row_minor is not None and row_major is  None:
+                            # 僅使用 row_minor 的數據
                             row = {
                                 'Depth (m)': depth,
-                                'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                                'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                                'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                                'Soil type': soil_type_major[idx],
+                                'qc (MPa)': row_minor.iloc[1],
+                                'fs (MPa)': row_minor.iloc[2],
+                                'u (MPa)': row_minor.iloc[3],
                             }
+                        # 更新索引和深度
+                        x += 1
+                        last_depth = depth
+                        depth += 0.02
                         data.append(row)
-                    matched_layers_minor.add(idx)
-
+                        
+                    matched_layers_major.add(idx)
         for i in include:
+            if i!=0:
+                print('include', i)
+                layers.append({
+                    "upper_depth_major": (major_position, upper_depth_major[idx]),
+                    "lower_depth_major": (major_position, upper_depth_major[idx]),
+                    "upper_depth_minor": (minor_position, upper_depth_minor[i]),
+                    "lower_depth_minor": (minor_position, lower_depth_minor[i]),
+                    "label": soil_type_minor[i],
+                    "color": color_mapping[str(int(soil_type_minor[i]))],
+                    "soil_type": soil_type_minor[i],
+                })
+                # 預測predict_borehole_data的數據
+                # 取用layers的數據
+                upper_limit = upper_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2
+                lower_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
+                upper_limit = round(upper_limit, 2)
+                lower_limit = round(lower_limit, 2)
+                print(upper_limit, lower_limit)
+                depth = upper_limit
 
-            layers.append({
-                "upper_depth_major": (major_position, upper_depth_major[idx]),
-                "lower_depth_major": (major_position, upper_depth_major[idx]),
-                "upper_depth_minor": (minor_position, upper_depth_minor[i]),
-                "lower_depth_minor": (minor_position, lower_depth_minor[i]),
-                "points": [
-                    (major_position, upper_depth_major[idx]),
-                    (major_position, upper_depth_major[idx]),
-                    (minor_position, upper_depth_minor[i]),
-                    (minor_position, lower_depth_minor[i]),
-                ],
-                "label": soil_type_minor[i],
-                "color": color_mapping[str(int(soil_type_minor[i]))],
-                "soil_type": soil_type_minor[i],
-            })
-            # 預測predict_borehole_data的數據
-            # 取用layers的數據
-            upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-            lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
-            upper_limit = round(upper_limit, 2)
-            lower_limit = round(lower_limit, 2)
-            
-            print(upper_limit, lower_limit)
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+            else:
+                if previous_depth_major != 0:
+                    layers.append({
+                        "upper_depth_major": (major_position, previous_depth_major ),
+                        "lower_depth_major": (major_position, previous_depth_major),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[i]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[i]),
+                        "label": soil_type_minor[i],
+                        "color": color_mapping[str(int(soil_type_minor[i]))],
+                        "soil_type": soil_type_minor[i],
+                    })
+                    # 預測predict_borehole_data的數據
+                    # 取用layers的數據
+                    upper_limit = previous_depth_major * weight_1 + upper_depth_minor[i] * weight_2
+                    lower_limit = previous_depth_major * weight_1 + lower_depth_minor[i] * weight_2
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
+                    depth = upper_limit
+                else:
+                    layers.append({
+                        "upper_depth_major": (major_position, previous_depth_major),
+                        "lower_depth_major": (major_position, upper_depth_major[0]),
+                        "upper_depth_minor": (minor_position, upper_depth_minor[i]),
+                        "lower_depth_minor": (minor_position, lower_depth_minor[i]),
+                        "label": soil_type_minor[i],
+                        "color": color_mapping[str(int(soil_type_minor[i]))],
+                        "soil_type": soil_type_minor[i],
+                    })
+                    # 預測predict_borehole_data的數據
+                    # 取用layers的數據
+                    upper_limit = previous_depth_major * weight_1 + upper_depth_minor[i] * weight_2
+                    lower_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
+                    upper_limit = round(upper_limit, 2)
+                    lower_limit = round(lower_limit, 2)
+                    print(upper_limit, lower_limit)
+                    depth = upper_limit
+
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
-                depth = upper_limit + 0.02 * x
-                if x < len(data_major) and i < len(data_minor):
+            # 初始化變數
+            x = 0
+
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                     }
-                elif x < len(data_major):
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
                     }
-                elif x < len(data_minor):
+                elif row_minor is not None and row_major is  None:
+                    # 僅使用 row_minor 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
                     }
+
+                # 更新索引和深度
+                x += 1
+                depth += 0.02
                 data.append(row)
+
+                last_depth = depth
             matched_layers_minor.add(i)
+            print('include add', matched_layers_minor)
+
     # 匹配剩下的
     for i in range(len(minor_section)):
+        print('match_layer', matched_layers_minor)
         if i not in matched_layers_minor:
+            print('剩下的', i)
             layers.append({
                 "upper_depth_major": (major_position, lower_depth_major[idx]),
                 "lower_depth_major": (major_position, lower_depth_major[idx]),
                 "upper_depth_minor": (minor_position, upper_depth_minor[i]),
                 "lower_depth_minor": (minor_position, lower_depth_minor[i]),
-                "points": [
-                    (major_position, lower_depth_major[idx]),
-                    (major_position, lower_depth_major[idx]),
-                    (minor_position, lower_depth_minor[i]),
-                    (minor_position, upper_depth_minor[i]),
-                ],
                 "label": soil_type_minor[i],
                 "color": color_mapping[str(int(soil_type_minor[i]))],
                 "soil_type": soil_type_minor[i],
             })
                         # 預測predict_borehole_data的數據
             # 取用layers的數據
-            upper_limit = layers[-1]['upper_depth_major'][1] * weight_1 + layers[-1]['upper_depth_minor'][1] * weight_2
-            lower_limit = layers[-1]['lower_depth_major'][1] * weight_1 + layers[-1]['lower_depth_minor'][1] * weight_2
+            upper_limit = lower_depth_major[idx] * weight_1 + upper_depth_minor[i] * weight_2
+            lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
             upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
             
             print(upper_limit, lower_limit)
-            steps = int((lower_limit - upper_limit) / 0.02) + 1
-            # 選取data_1和data_2在範圍upper_depth_major、upper_depth_minor、lower_depth_major和lower_depth_minor之間的數據
-            # 使用layers的數據
+            depth = upper_limit
+            if depth - last_depth >= 0.02:
+                print('不改變深度', depth)
+            else:
+                depth = depth + 0.01
             data_major = major_data[(major_data['Depth (m)'] >= upper_limit) & (major_data['Depth (m)'] <= lower_limit)]
             data_minor = minor_data[(minor_data['Depth (m)'] >= upper_limit) & (minor_data['Depth (m)'] <= lower_limit)]
-            # 初始化一個空列表來儲存資料
-            for x in range(steps):
-                depth = upper_limit + 0.02 * x
-                if x < len(data_major) and i < len(data_minor):
+            # 初始化變數
+            x = 0
+            # 遍歷深度範圍
+            while depth < lower_limit:
+                # 先檢查索引 x 是否在 data_major 和 data_minor 範圍內
+                row_major = data_major.iloc[x] if x < len(data_major) else None
+                row_minor = data_minor.iloc[x] if x < len(data_minor) else None
+
+                # 判斷 row_major 和 row_minor 是否有數據，並計算合併或單項數據
+                if row_major is not None and row_minor is not None:
+                    # 合併數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': (data_major.iloc[x]['qc (MPa)'] * weight_1 + data_minor.iloc[x]['qc (MPa)'] * weight_2),
-                        'fs (MPa)': (data_major.iloc[x]['fs (MPa)'] * weight_1 + data_minor.iloc[x]['fs (MPa)'] * weight_2),
-                        'u (MPa)': (data_major.iloc[x]['u (MPa)'] * weight_1 + data_minor.iloc[x]['u (MPa)'] * weight_2),
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': (row_major.iloc[1] * weight_1 + row_minor.iloc[1] * weight_2),
+                        'fs (MPa)': (row_major.iloc[2] * weight_1 + row_minor.iloc[2] * weight_2),
+                        'u (MPa)': (row_major.iloc[3] * weight_1 + row_minor.iloc[3] * weight_2),
                     }
-                elif x < len(data_major):
+                elif row_major is not None and row_minor is None:
+                    # 僅使用 row_major 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_major.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_major.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_major.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_major.iloc[1],
+                        'fs (MPa)': row_major.iloc[2],
+                        'u (MPa)': row_major.iloc[3],
                     }
-                elif x < len(data_minor):
+                elif row_minor is not None and row_major is  None:
+                    # 僅使用 row_minor 的數據
                     row = {
                         'Depth (m)': depth,
-                        'qc (MPa)': data_minor.iloc[x]['qc (MPa)'],
-                        'fs (MPa)': data_minor.iloc[x]['fs (MPa)'],
-                        'u (MPa)': data_minor.iloc[x]['u (MPa)'],
-                        'Soil type': soil_type_major[idx],
+                        'qc (MPa)': row_minor.iloc[1],
+                        'fs (MPa)': row_minor.iloc[2],
+                        'u (MPa)': row_minor.iloc[3],
                     }
+
+                # 更新索引和深度
+                x += 1
+                last_depth = depth
+                depth += 0.02
                 data.append(row)
-            matched_layers_minor.add(idx)
+                
+            matched_layers_minor.add(i)
+            print('剩下的 add', matched_layers_minor)
+        
     # 最後一次性轉換為 DataFrame
     predict_borehole_data = pd.DataFrame(data)
-    # 紀錄layers最後一筆資料的lower_depth_1和lower_depth_2
-    last_major_lower_depth = lower_depth_major[idx]
-    last_minor_lower_depth = lower_depth_minor[i]
+    # 抓前一筆的深度=前一個section的最後一筆lower_depth_major
+    previous_depth_major = lower_depth_major.iloc[-1]
+# 把predict_borehole_data的順序改為Depth (m)由小到大
+predict_borehole_data = predict_borehole_data.sort_values(by='Depth (m)', ascending=True)
+# 刪掉重複的數據
+predict_borehole_data = predict_borehole_data.drop_duplicates(subset='Depth (m)', keep='first')
 
 
 

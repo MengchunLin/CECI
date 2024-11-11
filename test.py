@@ -824,7 +824,8 @@ for depth_range in depth_ranges:
                 depth += 0.02
                 data.append(row)
                 
-            matched_layers_minor.add(idx)
+            matched_layers_minor.add(i)
+            print('剩下的 add', matched_layers_minor)
         
     # 最後一次性轉換為 DataFrame
     predict_borehole_data = pd.DataFrame(data)
