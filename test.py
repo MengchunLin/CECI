@@ -843,6 +843,7 @@ df_layers = pd.DataFrame(layers)
 
 
 
+
 predict_borehole['Type'] = df_layers['soil_type']
 
 # 分別取出深度值進行計算，並四捨五入到小數點後兩位
@@ -856,7 +857,8 @@ predict_borehole['Lower Depth'] = (
     df_layers['lower_depth_minor'].apply(lambda x: x[1]) * weight_2
 ).round(2)
 
-
+# 把predict_borehole的順序改為Upper Depth由小到大
+predict_borehole = predict_borehole.sort_values(by='Upper Depth', ascending=True)
 
 # 儲存預測的鑽孔位置
 predict_borehole.to_excel('predict_borehole.xlsx', index=False)
