@@ -49,6 +49,21 @@ weights = la.solve(gamma_matrix, gamma_pred)
 weights_known = weights[:-1]
 print('weights_known',weights_known)
 
-# 使用權重計算預測點的值
-P3_value_ordinary = np.dot(weights_known, values)
-print(P3_value_ordinary)
+import json
+
+# 保存結果到檔案的函數
+def save_result_to_file(file_path, data):
+    with open(file_path, 'w') as f:
+        json.dump(data, f)
+    print(f"結果已儲存到 {file_path}")
+
+# 儲存結果
+result_file = 'kriging_result.json'
+result_data = {
+    "predicted_position": pos_pred,
+    "weights": weights_known.tolist(),
+    "input_positions": positions.tolist(),
+}
+
+save_result_to_file(result_file, result_data) 
+print(result_data)

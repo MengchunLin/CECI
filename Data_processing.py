@@ -3,7 +3,8 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog, simpledialog
 import json
-
+from tkinter import messagebox
+import sys
 created_file = []
 # 選擇檔案
 def select_file():
@@ -15,13 +16,21 @@ def select_file():
 # 設定合併層厚度閾值
 def get_thickness_threshold():
     root = tk.Tk()
-    root.withdraw()
-    thickness_threshold = (simpledialog.askinteger("合併層厚度", "請輸入合併厚度 (cm):")) / 2
+    root.withdraw()  # 隱藏主視窗
+
+    # 在輸入框中直接顯示建議值
+    prompt_text = "請輸入土層合併厚度 (cm)\n（建議最小值為100cm）"
+    thickness_threshold = simpledialog.askinteger("合併層厚度", prompt_text)
+
+    # 如果使用者按下取消，直接結束程式
     if thickness_threshold is None:
-        thickness_threshold = 5  # 默認為5cm
+        root.destroy()
+        sys.exit()  # 結束程式執行
+
+    # 計算結果
+    thickness_threshold /= 2
     root.destroy()
     return thickness_threshold
-
 # 分類土壤類型
 def classify_soil_type(Ic):
     # 把Ic轉為float
@@ -195,7 +204,7 @@ def main():
     thickness_threshold = get_thickness_threshold()
     processed_files = []
     
-    # 假設處理兩個檔案
+    # 假設處理兩個檔案                          
     for i in range(2):
         file = select_file()
         processed_file = process_file(file, thickness_threshold)

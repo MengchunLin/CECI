@@ -9,6 +9,8 @@ import subprocess
 import json
 import os
 from decimal import Decimal, ROUND_UP
+import tkinter as tk
+from tkinter import filedialog, simpledialog
 
 # 運行第一個程式
 subprocess.run(["python", "Data_processing.py"])
@@ -43,38 +45,48 @@ def calculate_depth_statistics_with_qc_avg(df, original_file_path):
 
     # 準備變量來記錄每段土壤的範圍和平均IC值
     result = []
-    current_type = type_col.iloc[0]  # 從第201筆資料開始
-    start_depth = depth_col.iloc[0]
+    current_type = type_col.iloc[200]  # 從第201筆資料開始
+    start_depth = depth_col.iloc[200]
     ic_values = []
 
-    # 遍歷每一行，從第201筆開始，當遇到土壤類型變化或標記改變時，記錄當前土壤段的範圍
+    # 遍歷每一行，從第201筆開始
     for i in range(201, len(df)):
-        if type_col.iloc[i] != current_type:  # 當類型變化時，記錄當前段的數據
+        # 當土壤類型變化時記錄當前段的數據
+        if type_col.iloc[i] != current_type:
             end_depth = depth_col.iloc[i - 1]
-            average_ic = sum(ic_values) / len(ic_values) if ic_values else None
+            average_ic = round(sum(ic_values) / len(ic_values), 2) if ic_values else None
             result.append([current_type, start_depth, end_depth, average_ic])
+            print(f"記錄範圍: {current_type}, {start_depth}-{end_depth}, Average Ic: {average_ic}")  # 除錯列印
             current_type = type_col.iloc[i]
             start_depth = depth_col.iloc[i]
             ic_values = []  # 重置IC值列表
 
         # 僅在條件符合時記錄 Ic 值
-        if Mark_2.iloc[i] != '*' and pd.notna(Bq.iloc[i]) and Bq.iloc[i] != 0 and Mark_1.iloc[i] != '*':
+        if (
+            Mark_2.iloc[i] != '*'
+            and pd.notna(Bq.iloc[i])
+            and Bq.iloc[i] != 0
+            and Mark_1.iloc[i] != '*'
+        ):
             ic_values.append(ic_col.iloc[i])
 
-    # 記錄最後一段土壤的範圍及平均IC值
+    # 處理最後一段土壤類型的數據
     end_depth = depth_col.iloc[-1]
-    average_ic = sum(ic_values) / len(ic_values) if ic_values else None
+    average_ic = round(sum(ic_values) / len(ic_values), 2) if ic_values else None
     result.append([current_type, start_depth, end_depth, average_ic])
-
+    print(f"記錄範圍: {current_type}, {start_depth}-{end_depth}, Average Ic: {average_ic}")  # 除錯列印
+    # 更改第一個upper_depth
+    result[0][1] = 0.02
     # 創建 DataFrame 保存結果
     depth_stats_df = pd.DataFrame(result, columns=['Type', 'Upper Depth', 'Lower Depth', 'Average Ic'])
 
     # 自動保存結果
     save_path = auto_save_file(original_file_path)
     depth_stats_df.to_excel(save_path, index=False)
-
+    print(f"結果已儲存至: {save_path}")
 
     return depth_stats_df
+
 
 for i in range(2):
     calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[i]), processed_files[i])
@@ -88,8 +100,43 @@ data_2 = pd.read_excel(processed_files[1])
 
 
 # 定義鑽孔位置
-borehole_position_1 = 0
-borehole_position_2 = 1580.53
+# 輸入鑽孔位置
+def get_borehole_position():
+    def submit():
+        try:
+            position1 = float(entry1.get())
+            position2 = float(entry2.get())
+            result.append((position1, position2))
+            popup.destroy()
+        except ValueError:
+            tk.messagebox.showerror("輸入錯誤", "請輸入有效的浮點數！")
+
+    # 建立自定義視窗
+    popup = tk.Tk()
+    popup.title("鑽孔位置輸入")
+
+    # 標籤與輸入框
+    tk.Label(popup, text="請輸入第一個鑽孔位置：").pack(pady=5)
+    entry1 = tk.Entry(popup)
+    entry1.pack()
+
+    tk.Label(popup, text="請輸入第二個鑽孔位置：").pack(pady=5)
+    entry2 = tk.Entry(popup)
+    entry2.pack()
+
+    # 提交按鈕
+    tk.Button(popup, text="提交", command=submit).pack(pady=10)
+
+    result = []
+    popup.mainloop()
+
+    # 返回結果
+    return result[0] if result else (None, None)
+
+borehole_position_1, borehole_position_2 = get_borehole_position()
+
+# 計算克利金權重
+subprocess.run(["python", "Kriging.py"])
 
 weight_1 = 0.5
 weight_2 = 0.5
@@ -117,7 +164,38 @@ predict_borehole_data = pd.DataFrame({
     'Soil type': pd.Series(dtype='object')
 })
 
-depth_ranges = [(0,60),(60,80),(80,110)]  # 定義深度區間
+
+#　depth_ranges = [(0,60),(60,80),(80,110)]  # 定義深度區間
+def get_depth_ranges():
+    root = tk.Tk()
+    root.withdraw()  # 隱藏主視窗
+
+    # 提示使用者輸入深度區間，格式為 (0,60),(60,80),(80,110)
+    ranges_input = simpledialog.askstring(
+        "深度區間輸入",
+        "請輸入深度區間，格式為：[(0,60),(60,80),(80,110)]\n（若未輸入，將使用預設值）"
+    )
+    
+    if not ranges_input:  # 如果使用者取消或未輸入，返回預設深度區間
+        root.destroy()
+        return [(0, 60), (60, 80), (80, 110)]
+
+    try:
+        # 將輸入的字串解析為深度區間列表
+        depth_ranges = eval(ranges_input)
+        if isinstance(depth_ranges, list) and all(
+            isinstance(item, tuple) and len(item) == 2 for item in depth_ranges
+        ):
+            root.destroy()
+            return depth_ranges
+        else:
+            raise ValueError
+    except Exception:
+        tk.messagebox.showerror("輸入錯誤", "深度區間格式不正確，默認為(0, 60), (60, 80), (80, 110)！")
+        root.destroy()
+        return [(0, 60), (60, 80), (80, 110)]  # 返回預設值
+
+depth_ranges = get_depth_ranges()
 
 previous_section_1 = None
 previous_section_2 = None
@@ -836,13 +914,8 @@ predict_borehole_data = predict_borehole_data.sort_values(by='Depth (m)', ascend
 # 刪掉重複的數據
 predict_borehole_data = predict_borehole_data.drop_duplicates(subset='Depth (m)', keep='first')
 
-
-
 # 把 layers 的資料轉換成 DataFrame
 df_layers = pd.DataFrame(layers)
-
-
-
 
 predict_borehole['Type'] = df_layers['soil_type']
 
@@ -865,9 +938,6 @@ predict_borehole.to_excel('predict_borehole.xlsx', index=False)
 
 # 儲存預測的鑽孔資料
 predict_borehole_data.to_excel('predict_borehole_data.xlsx', index=False)
-
-
-
 
 # 繪圖
 fig, ax = plt.subplots(figsize=(12, 8))
