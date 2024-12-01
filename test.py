@@ -12,9 +12,9 @@ from decimal import Decimal, ROUND_UP
 import sys
 
 # 運行第一個程式
-subprocess.run(["python", "Data_processing.py"])
+#subprocess.run(["python", "Data_processing.py"])
 
-subprocess.run(["python", "Kriging.py"])
+#subprocess.run(["python", "Kriging.py"])
 
 with open("result.json", "r") as f:
     result = json.load(f)
@@ -95,10 +95,10 @@ data_1 = pd.read_excel(processed_files[0])
 data_2 = pd.read_excel(processed_files[1])
 
 borehole_position_1 = result["positions_1"]
-borehole_position_2 = 1500
+borehole_position_2 = result["positions_2"]
 weight_1 = result["weight_1"]
 weight_2 = result["weight_2"]
-predict_position = 800
+predict_position = result["prediction_position"]
 
 
 
