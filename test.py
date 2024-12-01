@@ -9,9 +9,15 @@ import subprocess
 import json
 import os
 from decimal import Decimal, ROUND_UP
+import sys
 
 # 運行第一個程式
 subprocess.run(["python", "Data_processing.py"])
+
+subprocess.run(["python", "Kriging.py"])
+
+with open("result.json", "r") as f:
+    result = json.load(f)
 
 # 讀取第一個程式生成的處理後檔案路徑
 with open("processed_files.xlsx", "r") as f:
@@ -82,17 +88,19 @@ for i in range(2):
 # 如果需要分別讀取第一和第二個檔案
 df_1 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[0]), processed_files[0])
 df_2 = calculate_depth_statistics_with_qc_avg(pd.read_excel(processed_files[1]), processed_files[1])
+print(df_1)
+print(df_2)
 # 儲存一份processed_files.xlsx
 data_1 = pd.read_excel(processed_files[0])
 data_2 = pd.read_excel(processed_files[1])
 
+borehole_position_1 = result["positions_1"]
+borehole_position_2 = 1500
+weight_1 = result["weight_1"]
+weight_2 = result["weight_2"]
+predict_position = 800
 
-# 定義鑽孔位置
-borehole_position_1 = 0
-borehole_position_2 = 1580.53
 
-weight_1 = 0.5
-weight_2 = 0.5
 
 # 定義顏色映射
 color_mapping = {
@@ -101,6 +109,14 @@ color_mapping = {
     '3': 'plum',
     '4': 'darkkhaki',
     '5': 'burlywood',
+}
+
+soil_names = {
+    1: 'Sand',
+    2: 'Silty Sand',
+    3: 'Sandy Silt',
+    4: 'Clayey Silt',
+    5: 'Clay',
 }
 
 # 初始化變量
@@ -173,8 +189,6 @@ for depth_range in depth_ranges:
     # 重置索引
     section_df_1 = section_df_1.reset_index(drop=True)
     section_df_2 = section_df_2.reset_index(drop=True)
-    print(section_df_1)
-    print(section_df_2)
     
     # 保存當前區間的數據作為下一次迭代的previous
     previous_section_1 = section_df_1.copy()
@@ -245,8 +259,7 @@ for depth_range in depth_ranges:
             lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
             upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
-            print('upper_limit', upper_limit)
-            print('lower_limit', lower_limit)
+ 
             depth = upper_limit
             if depth - last_depth >= 0.02:
                 print('不改變深度', depth)
@@ -296,7 +309,7 @@ for depth_range in depth_ranges:
                 
             matched_layers_major.add(idx)
             matched_layers_minor.add(match_layer)
-            print('flag add', matched_layers_minor)
+
 
 
         
@@ -317,8 +330,7 @@ for depth_range in depth_ranges:
                 lower_limit = lower_depth_major[idx] * weight_1 + lower_depth_minor[match_layer] * weight_2
                 upper_limit = round(upper_limit, 2)
                 lower_limit = round(lower_limit, 2)
-                print('upper_limit', upper_limit)
-                print('lower_limit', lower_limit)
+
                 depth = upper_limit
                 if depth - last_depth >= 0.02:
                     print('不改變深度', depth)
@@ -387,8 +399,6 @@ for depth_range in depth_ranges:
                     lower_limit = lower_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print('upper_limit', upper_limit)
-                    print('lower_limit', lower_limit)
                     depth = upper_limit
                     if depth - last_depth >= 0.02:
                         print('不改變深度', depth)
@@ -452,9 +462,7 @@ for depth_range in depth_ranges:
                     lower_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print('upper_limit', upper_limit)
-                    print('lower_limit', lower_limit)
-                    
+
                     depth = upper_limit
                     if depth - last_depth >= 0.02:
                         print('不改變深度', depth)
@@ -506,7 +514,6 @@ for depth_range in depth_ranges:
                         data.append(row)
                         
                     matched_layers_minor.add(idx)
-                    print('not flag add', matched_layers_minor)
 
                     
                 # 當副鑽孔的深度大於主鑽孔的深度
@@ -526,7 +533,6 @@ for depth_range in depth_ranges:
                     lower_limit = upper_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print(upper_limit, lower_limit)
                     depth = upper_limit
                     if depth - last_depth >= 0.02:
                         print('不改變深度', depth)
@@ -578,7 +584,6 @@ for depth_range in depth_ranges:
                         data.append(row)
                         
                     matched_layers_minor.add(0)
-                    print('not flag add', matched_layers_minor)
 
                     layers.append({
                         "upper_depth_major": (major_position, upper_depth_major[0]),
@@ -595,7 +600,6 @@ for depth_range in depth_ranges:
                     lower_limit = lower_depth_major[0] * weight_1 + lower_depth_minor[0] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print(upper_limit, lower_limit)
                     depth = upper_limit
                     if depth - last_depth >= 0.02:
                         print('不改變深度', depth)
@@ -648,7 +652,7 @@ for depth_range in depth_ranges:
                     matched_layers_major.add(idx)
         for i in include:
             if i!=0:
-                print('include', i)
+
                 layers.append({
                     "upper_depth_major": (major_position, upper_depth_major[idx]),
                     "lower_depth_major": (major_position, upper_depth_major[idx]),
@@ -664,7 +668,6 @@ for depth_range in depth_ranges:
                 lower_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
                 upper_limit = round(upper_limit, 2)
                 lower_limit = round(lower_limit, 2)
-                print(upper_limit, lower_limit)
                 depth = upper_limit
 
             else:
@@ -684,7 +687,6 @@ for depth_range in depth_ranges:
                     lower_limit = previous_depth_major * weight_1 + lower_depth_minor[i] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print(upper_limit, lower_limit)
                     depth = upper_limit
                 else:
                     layers.append({
@@ -702,7 +704,6 @@ for depth_range in depth_ranges:
                     lower_limit = upper_depth_major[idx] * weight_1 + lower_depth_minor[i] * weight_2
                     upper_limit = round(upper_limit, 2)
                     lower_limit = round(lower_limit, 2)
-                    print(upper_limit, lower_limit)
                     depth = upper_limit
 
             if depth - last_depth >= 0.02:
@@ -753,13 +754,12 @@ for depth_range in depth_ranges:
 
                 last_depth = depth
             matched_layers_minor.add(i)
-            print('include add', matched_layers_minor)
 
     # 匹配剩下的
     for i in range(len(minor_section)):
-        print('match_layer', matched_layers_minor)
+
         if i not in matched_layers_minor:
-            print('剩下的', i)
+
             layers.append({
                 "upper_depth_major": (major_position, lower_depth_major[idx]),
                 "lower_depth_major": (major_position, lower_depth_major[idx]),
@@ -776,7 +776,6 @@ for depth_range in depth_ranges:
             upper_limit = round(upper_limit, 2)
             lower_limit = round(lower_limit, 2)
             
-            print(upper_limit, lower_limit)
             depth = upper_limit
             if depth - last_depth >= 0.02:
                 print('不改變深度', depth)
@@ -825,7 +824,6 @@ for depth_range in depth_ranges:
                 data.append(row)
                 
             matched_layers_minor.add(i)
-            print('剩下的 add', matched_layers_minor)
         
     # 最後一次性轉換為 DataFrame
     predict_borehole_data = pd.DataFrame(data)
@@ -840,10 +838,7 @@ predict_borehole_data = predict_borehole_data.drop_duplicates(subset='Depth (m)'
 
 # 把 layers 的資料轉換成 DataFrame
 df_layers = pd.DataFrame(layers)
-
-
-
-
+print('df_layers', df_layers)
 predict_borehole['Type'] = df_layers['soil_type']
 
 # 分別取出深度值進行計算，並四捨五入到小數點後兩位
@@ -866,9 +861,6 @@ predict_borehole.to_excel('predict_borehole.xlsx', index=False)
 # 儲存預測的鑽孔資料
 predict_borehole_data.to_excel('predict_borehole_data.xlsx', index=False)
 
-
-
-
 # 繪圖
 fig, ax = plt.subplots(figsize=(12, 8))
 
@@ -888,26 +880,41 @@ for layer in layers:
     # 定義多邊形，使用四個點構成的列表
     polygon = Polygon(points, closed=True, color=color, alpha=0.7)
     ax.add_patch(polygon)
+
+    # 使用 soil_names 將 label 轉換為土壤名稱
+    soil_type_with_number = f"{soil_names.get(label, 'Unknown')} ({label})"
     
     if label not in used_labels:
-        legend_handles.append(plt.Rectangle((0, 0), 1, 1, fc=color, alpha=0.7, label=label))
+        legend_handles.append(plt.Rectangle((0, 0), 1, 1, fc=color, alpha=0.7, label=soil_type_with_number))
         used_labels.add(label)
 
-# 添加鑽孔位置線
-ax.axvline(x=borehole_position_1, color='black', linestyle='--', linewidth=1, label='Borehole 1')
-ax.axvline(x=borehole_position_2, color='black', linestyle='--', linewidth=1, label='Borehole 2')
-ax.axvline(x=780, color='black', linestyle='--', linewidth=1, label='Borehole 2')
-ax.axvline(x=785, color='black', linestyle='--', linewidth=1, label='Borehole 2')
+# 圖面上鑽孔名稱
+borehole_name_1 = result["file1"]
+borehole_name_2 = result["file2"]
+prediction = result["prediction"]
+predict_position = result["prediction_position"]
+print('predict_position', predict_position)
+
 
 # 設置圖例
-ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.15, 1))
+# ax.legend(handles=legend_handles, loc='upper right', bbox_to_anchor=(1.15, 1))
+ax.legend(handles=legend_handles, loc='upper right', title="Soil Types", fontsize=10, bbox_to_anchor=(1.15, 1))
+# 標註鑽孔位置及畫線
+
+ax.text(borehole_position_1, -1, borehole_name_1, fontsize=15, ha='center')
+ax.axvline(x=borehole_position_1, color='sienna', linestyle='-', linewidth=5)
+ax.text(predict_position, -1, prediction, fontsize=15, ha='center')
+ax.axvline(x=predict_position, color='red', linestyle='--', linewidth=2)
+ax.text(borehole_position_2, -1, borehole_name_2, fontsize=15, ha='center')
+ax.axvline(x=borehole_position_2, color='sienna', linestyle='-', linewidth=5)
+
 
 # 設置軸和標題
 ax.yaxis.set_major_locator(ticker.MultipleLocator(10))
 plt.gca().invert_yaxis()
 ax.set_xlim(0, borehole_position_2)
 ax.set_ylim(105, 0)
-ax.set_title("Soil Type Visualization between Boreholes")
+ax.set_title("Kriging Prediction",pad=20)
 ax.set_xlabel("Distance (m)")
 ax.set_ylabel("Depth (m)")
 

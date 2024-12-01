@@ -1,21 +1,36 @@
 from scipy.spatial.distance import pdist, squareform
 import numpy as np
 import scipy.linalg as la
+import tkinter as tk
+from tkinter import simpledialog
+from tkinter import messagebox
+import json
 
-# 已知鑽孔的位置和測量值
-positions = np.array([1, 1559.53])
-values = np.array([38.72, 37.92])
+# 打開result.json文件
+def open_json():
+    with open("result.json", "r") as json_file:
+        data = json.load(json_file)
+    return data
 
-# 預測點位置
-pos_pred = 781.48
+result = open_json()
+
+# 初始化空的 positions
+positions_1 = result["positions_1"]
+positions_2 = result["positions_2"]
+pos_pred = float(result["prediction_position"])
+positions = [
+    float(result["positions_1"]),
+    float(result["positions_2"])
+]
+positions = np.array(positions)
+
+# 設定半變異函數參數
+range_ = float(positions_2)  # 半變異函數的影響範圍
+sill = 1       # 極差
 
 # 定義球狀半變異函數模型
 def spherical_variogram(h, range_, sill):
     return np.where(h <= range_, sill * (1.5 * (h / range_) - 0.5 * (h / range_) ** 3), sill)
-
-# 設定半變異函數參數
-range_ = 1559.53  # 半變異函數的影響範圍
-sill = 1       # 極差
 
 # 計算已知點之間的距離矩陣
 dist_matrix = squareform(pdist(positions.reshape(-1, 1), metric='euclidean'))
@@ -49,6 +64,12 @@ weights = la.solve(gamma_matrix, gamma_pred)
 weights_known = weights[:-1]
 print('weights_known',weights_known)
 
-# 使用權重計算預測點的值
-P3_value_ordinary = np.dot(weights_known, values)
-print(P3_value_ordinary)
+# 將結果存成json, 但不影響原有的json文件
+result["weight_1"] = weights_known[0]
+result["weight_2"] = weights_known[1]
+
+# 保存结果到 JSON 文件
+output_file = "result.json"
+with open(output_file, "w") as json_file:
+    json.dump(result, json_file)
+print(f"结果已保存到 {output_file}")
